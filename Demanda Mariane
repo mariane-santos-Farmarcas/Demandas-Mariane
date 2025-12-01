@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Tarefas Interativo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
+        .task-card { cursor: grab; transition: all 0.2s ease-in-out; }
+        .task-card .card-controls { opacity: 0; transition: opacity 0.2s ease-in-out; }
+        .task-card:hover .card-controls { opacity: 1; }
+        .task-card .checklist-details { display: none; max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .task-card:hover .checklist-details { display: block; max-height: 200px; }
+        .task-card.no-drag { cursor: default; }
+        .task-card:active { cursor: grabbing; transform: scale(1.05); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .task-column.drag-over { border-style: dashed; border-color: #3b82f6; background-color: #eff6ff; }
+        .task-list::-webkit-scrollbar, #kanban-board::-webkit-scrollbar { width: 8px; height: 8px; }
+        .task-list::-webkit-scrollbar-track, #kanban-board::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 10px; }
+        .task-list::-webkit-scrollbar-thumb, #kanban-board::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 10px; border: 2px solid #e2e8f0; }
+        .tab-btn { transition: all 0.2s ease-in-out; }
+        .tab-btn.active { background-color: #ffffff; color: #2563eb; border-bottom-color: #2563eb; font-weight: 600; }
+        .task-detail { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #4a5568; }
+        .task-detail i { width: 14px; text-align: center; }
+        .task-observations img, #taskObservacoes img { max-width: 100%; height: auto; border-radius: 0.25rem; margin-top: 0.5rem; display: block; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-6">
+            <h1 id="board-title" class="text-3xl md:text-4xl font-bold text-gray-800 text-center md:text-left">Painel de Tarefas</h1>
+            <p class="text-gray-500 mt-1 text-center md:text-left">Selecione um painel abaixo para ver e organizar suas tarefas.</p>
+        </header>
+
+        <nav id="tabs-container" class="flex border-b border-gray-300 mb-6 bg-gray-200 rounded-t-lg p-1"></nav>
+
+        <section id="productivity-dashboard" class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-500">
+                <h2 class="text-sm font-medium text-gray-500">Total de Tarefas</h2>
+                <p id="total-tasks" class="text-3xl font-bold text-gray-800">0</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-orange-500">
+                <h2 class="text-sm font-medium text-gray-500">A Fazer</h2>
+                <p id="todo-tasks" class="text-3xl font-bold text-orange-500">0</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+                <h2 class="text-sm font-medium text-gray-500">Em Andamento</h2>
+                <p id="doing-tasks" class="text-3xl font-bold text-blue-500">0</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
+                <h2 class="text-sm font-medium text-gray-500">Concluídas</h2>
+                <p id="done-tasks" class="text-3xl font-bold text-green-500">0</p>
+            </div>
+        </section>
+
+        <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
+             <div class="flex flex-wrap gap-2">
+                <button id="addTaskBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors flex items-center gap-2"><i class="fas fa-plus"></i> Adicionar Tarefa</button>
+                <button id="generateSummaryBtn" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-purple-700 transition-colors flex items-center gap-2">✨ Gerar Resumo</button>
+                <button id="importBtn" class="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-teal-700 transition-colors flex items-center gap-2"><i class="fas fa-upload"></i> Importar</button>
+                <input type="file" id="importFile" class="hidden" accept=".csv">
+                <button id="exportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-700 transition-colors flex items-center gap-2"><i class="fas fa-download"></i> Exportar / Modelo CSV</button>
+            </div>
+            <button id="clearAllBtn" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-red-600 transition-colors flex items-center gap-2"><i class="fas fa-trash"></i> Limpar Painel Atual</button>
+        </div>
+
+        <main id="kanban-board" class="flex gap-6 overflow-x-auto pb-4">
+            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 sm:w-96 flex-shrink-0" data-column-id="todo">
+                <h3 class="font-bold text-lg mb-4 text-orange-600 flex items-center gap-2"><i class="fas fa-list-check"></i>A Fazer</h3>
+                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="todo-list"></div>
+            </div>
+            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 sm:w-96 flex-shrink-0" data-column-id="doing">
+                <h3 class="font-bold text-lg mb-4 text-blue-600 flex items-center gap-2"><i class="fas fa-person-digging"></i>Em Andamento</h3>
+                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="doing-list"></div>
+            </div>
+            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 sm:w-96 flex-shrink-0" data-column-id="done">
+                <h3 class="font-bold text-lg mb-4 text-green-600 flex items-center gap-2"><i class="fas fa-check-double"></i>Concluído</h3>
+                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="done-list"></div>
+            </div>
+        </main>
+        
+        <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md"></div>
+    </div>
+
+    <div id="taskModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-lg m-4 max-h-[90vh] overflow-y-auto">
+            <h2 id="modalTitle" class="text-2xl font-bold mb-6">Nova Tarefa</h2>
+            <form id="taskForm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="mb-4"><label class="block text-gray-700 font-medium mb-1">Tarefa</label><input type="text" id="taskTarefa" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                    <div class="mb-4"><label class="block text-gray-700 font-medium mb-1">Solicitante</label><input type="text" id="taskSolicitante" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div class="mb-4"><label class="block text-gray-700 font-medium mb-1">Data da Solicitação</label><input type="date" id="taskDataSolicitacao" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div class="mb-4"><label class="block text-gray-700 font-medium mb-1">Data de Agendamento</label><input type="date" id="taskDataAgendamento" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div class="mb-4 col-span-1 md:col-span-2"><label class="block text-gray-700 font-medium mb-1">Data da Entrega</label><input type="date" id="taskDataEntrega" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <div class="mb-4 col-span-1 md:col-span-2">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-gray-700 font-medium">Observações</label>
+                            <button type="button" id="generateAIBtn" class="text-xs bg-purple-100 text-purple-700 font-semibold py-1 px-2 rounded-full hover:bg-purple-200 transition-colors flex items-center gap-1">✨ Gerar com IA</button>
+                        </div>
+                        <div id="taskObservacoes" contenteditable="true" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[84px] overflow-y-auto"></div>
+                    </div>
+                    <div class="mb-4 col-span-1 md:col-span-2">
+                        <label class="block text-gray-700 font-medium mb-1">Checklist de Ações</label>
+                        <div id="checklist-container" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-1"></div>
+                        <div class="flex gap-2">
+                            <input type="text" id="checklistItemInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Adicionar nova ação...">
+                            <button type="button" id="addChecklistItemBtn" class="bg-gray-200 text-gray-700 font-bold py-2 px-3 rounded-lg hover:bg-gray-300 transition-colors"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" id="taskId">
+                <div class="flex justify-end gap-4 mt-4">
+                    <button type="button" id="cancelBtn" class="bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">Salvar Tarefa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="summaryModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-2xl m-4 max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-4 border-b">
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">✨ Resumo de Produtividade</h2>
+                <button id="closeSummaryBtn" class="text-2xl text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            <div id="summaryContent" class="overflow-y-auto text-gray-700 space-y-4"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Importando Firebase via CDN (necessário para funcionar no HTML direto)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBxNEQJTCcYUJrHyMzdqo7aLGItrInziWs",
+            authDomain: "painel-interativo-mariane.firebaseapp.com",
+            databaseURL: "https://painel-interativo-mariane-default-rtdb.firebaseio.com",
+            projectId: "painel-interativo-mariane",
+            storageBucket: "painel-interativo-mariane.firebasestorage.app",
+            messagingSenderId: "341260082808",
+            appId: "1:341260082808:web:699e099dd4f18e3429578d"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        console.log("Firebase inicializado com sucesso");
+
+        // --- Lógica Principal da Aplicação (Mantida do original) ---
+        // Gemini API Configuration (PREENCHA AQUI SUA CHAVE SE NECESSÁRIO)
+        const GEMINI_API_KEY = ""; 
+        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
+        
+        const boards = [
+            { id: 'consolidado', name: 'Consolidado' },
+            { id: 'geral', name: 'Tarefas no Geral' },
+            { id: 'planejamento', name: 'Planejamento Estratégico' },
+            { id: 'plano-acao', name: 'Plano de Ação' },
+            { id: 'entregas-internas', name: 'Entregas Internas' }
+        ];
+        let activeBoardId = boards[1].id;
+
+        // DOM Elements
+        const tabsContainer = document.getElementById('tabs-container');
+        const boardTitle = document.getElementById('board-title');
+        const addTaskBtn = document.getElementById('addTaskBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const taskModal = document.getElementById('taskModal');
+        const taskForm = document.getElementById('taskForm');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const modalTitle = document.getElementById('modalTitle');
+        const generateAIBtn = document.getElementById('generateAIBtn');
+        const generateSummaryBtn = document.getElementById('generateSummaryBtn');
+        const summaryModal = document.getElementById('summaryModal');
+        const closeSummaryBtn = document.getElementById('closeSummaryBtn');
+        const summaryContent = document.getElementById('summaryContent');
+        const checklistContainer = document.getElementById('checklist-container');
+        const checklistItemInput = document.getElementById('checklistItemInput');
+        const addChecklistItemBtn = document.getElementById('addChecklistItemBtn');
+        const importBtn = document.getElementById('importBtn');
+        const importFile = document.getElementById('importFile');
+        const exportBtn = document.getElementById('exportBtn');
+        
+        const columns = {
+            todo: document.getElementById('todo-list'),
+            doing: document.getElementById('doing-list'),
+            done: document.getElementById('done-list')
+        };
+        const taskColumns = document.querySelectorAll('.task-column');
+
+        // --- Checklist Logic ---
+        const getChecklistDataFromModal = () => {
+            const items = [];
+            checklistContainer.querySelectorAll('.checklist-item').forEach(itemEl => {
+                const text = itemEl.querySelector('input[type="text"]').value.trim();
+                const checked = itemEl.querySelector('input[type="checkbox"]').checked;
+                if (text) items.push({ text, checked });
+            });
+            return items;
+        };
+
+        const renderChecklistInModal = (checklist = []) => {
+            checklistContainer.innerHTML = '';
+            checklist.forEach((item, index) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'checklist-item flex items-center gap-2 bg-gray-50 p-2 rounded-md';
+                itemEl.innerHTML = `
+                    <input type="checkbox" id="check-${index}" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${item.checked ? 'checked' : ''}>
+                    <input type="text" value="${item.text}" class="flex-grow bg-transparent focus:outline-none focus:bg-white p-1 rounded-sm">
+                    <button type="button" class="delete-checklist-item-btn text-gray-400 hover:text-red-600 text-xs"><i class="fas fa-trash"></i></button>
+                `;
+                checklistContainer.appendChild(itemEl);
+            });
+        };
+
+        const handleAddChecklistItem = () => {
+            const text = checklistItemInput.value.trim();
+            if (text) {
+                const currentItems = getChecklistDataFromModal();
+                renderChecklistInModal([...currentItems, { text, checked: false }]);
+                checklistItemInput.value = '';
+                checklistItemInput.focus();
+            }
+        };
+
+        addChecklistItemBtn.addEventListener('click', handleAddChecklistItem);
+        checklistItemInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); handleAddChecklistItem(); }
+        });
+        checklistContainer.addEventListener('click', (e) => {
+            if (e.target.closest('.delete-checklist-item-btn')) {
+                e.target.closest('.checklist-item').remove();
+            }
+        });
+
+        // --- Modal Logic ---
+        const toggleModal = (task = null, isDuplicating = false) => {
+            taskForm.reset();
+            document.getElementById('taskObservacoes').innerHTML = '';
+            renderChecklistInModal(); 
+            if (task) {
+                if (isDuplicating) {
+                    modalTitle.textContent = 'Duplicar Tarefa';
+                    document.getElementById('taskId').value = ''; 
+                } else {
+                    modalTitle.textContent = 'Editar Tarefa';
+                    document.getElementById('taskId').value = task.id;
+                }
+                document.getElementById('taskTarefa').value = task.tarefa;
+                document.getElementById('taskSolicitante').value = task.solicitante;
+                document.getElementById('taskDataSolicitacao').value = task.dataSolicitacao;
+                document.getElementById('taskDataAgendamento').value = task.dataAgendamento;
+                document.getElementById('taskDataEntrega').value = task.dataEntrega;
+                document.getElementById('taskObservacoes').innerHTML = task.observacoes || '';
+                if (task.checklist) {
+                    try {
+                       renderChecklistInModal(JSON.parse(task.checklist));
+                    } catch(e) { console.error("Could not parse checklist", e)}
+                }
+            } else {
+                modalTitle.textContent = 'Nova Tarefa';
+                document.getElementById('taskId').value = '';
+            }
+            taskModal.classList.toggle('hidden');
+            taskModal.classList.toggle('flex');
+        };
+        
+        // --- Gemini API Call Handlers ---
+        const handleAIGeneration = async () => {
+            const taskTitle = document.getElementById('taskTarefa').value;
+            if (!taskTitle.trim()) {
+                generateAIBtn.textContent = 'Digite um título!';
+                setTimeout(() => { generateAIBtn.innerHTML = '✨ Gerar com IA' }, 2000);
+                return;
+            }
+
+            const originalButtonText = generateAIBtn.innerHTML;
+            generateAIBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Gerando...`;
+            generateAIBtn.disabled = true;
+
+            const systemPrompt = "Aja como um gerente de projetos sênior. Sua tarefa é detalhar um título de tarefa em uma lista de subtarefas ou um plano de ação claro e conciso. Use bullet points (hifens) para organizar a resposta. Responda em português brasileiro.";
+            const userQuery = `Detalhe a seguinte tarefa: "${taskTitle}"`;
+            const payload = { contents: [{ parts: [{ text: userQuery }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
+
+            try {
+                const response = await fetch(GEMINI_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (candidate?.content?.parts?.[0]?.text) {
+                    const generatedText = candidate.content.parts[0].text;
+                    const observationsEditor = document.getElementById('taskObservacoes');
+                    observationsEditor.innerHTML += (observationsEditor.innerHTML.trim().length > 0) 
+                        ? `<br><br>--- IA ---<br>${generatedText.replace(/\n/g, '<br>')}` 
+                        : generatedText.replace(/\n/g, '<br>');
+                } else { throw new Error('Invalid AI response structure'); }
+            } catch (error) {
+                console.error('Erro ao chamar a API Gemini:', error);
+                document.getElementById('taskObservacoes').innerHTML += '<br><br>(Não foi possível conectar com a IA.)';
+            } finally {
+                generateAIBtn.innerHTML = originalButtonText;
+                generateAIBtn.disabled = false;
+            }
+        };
+
+        const handleSummaryGeneration = async () => {
+            summaryContent.innerHTML = `<div class="text-center p-8"><i class="fas fa-spinner fa-spin text-4xl text-purple-500"></i><p class="mt-4">Analisando suas tarefas e gerando insights...</p></div>`;
+            summaryModal.classList.remove('hidden');
+            summaryModal.classList.add('flex');
+
+            const allTasks = [];
+            boards.forEach(board => {
+                if (board.id === 'consolidado') return;
+                const boardTasks = JSON.parse(localStorage.getItem(getStorageKey(board.id))) || getInitialTasks(board.id);
+                if(boardTasks.todo) boardTasks.todo.forEach(t => allTasks.push({ board: board.name, status: 'A Fazer', title: t.tarefa }));
+                if(boardTasks.doing) boardTasks.doing.forEach(t => allTasks.push({ board: board.name, status: 'Em Andamento', title: t.tarefa }));
+                if(boardTasks.done) boardTasks.done.forEach(t => allTasks.push({ board: board.name, status: 'Concluído', title: t.tarefa, date: t.dataEntrega }));
+            });
+
+            if (allTasks.length === 0) {
+                summaryContent.innerHTML = `<p class="text-center">Não há tarefas para analisar. Adicione algumas e tente novamente!</p>`;
+                return;
+            }
+
+            const tasksString = allTasks.map(t => `- Título: ${t.title}, Status: ${t.status}, Painel: ${t.board}`).join('\n');
+            const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+            const systemPrompt = "Você é um coach de produtividade e analista de projetos chamado 'Gemini Insights'. Sua resposta deve ser em português do Brasil, usando um tom motivacional, encorajador e profissional. Use Markdown para formatar a resposta com cabeçalhos (##), listas (-) e negrito (**).";
+            const userQuery = `Hoje é ${today}. Analise a seguinte lista de tarefas e gere um resumo de produtividade com as seções: "Visão Geral", "Destaques e Conquistas", "Foco da Semana", e "Dica Rápida de Produtividade".\n\nDados das Tarefas:\n${tasksString}`;
+            const payload = { contents: [{ parts: [{ text: userQuery }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
+
+            try {
+                const response = await fetch(GEMINI_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (candidate?.content?.parts?.[0]?.text) {
+                    const generatedText = candidate.content.parts[0].text;
+                    const lines = generatedText.split('\n');
+                    let htmlContent = '';
+                    let inList = false;
+                    lines.forEach(line => {
+                        line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                        if (line.startsWith('## ')) {
+                            if (inList) { htmlContent += `</ul>`; inList = false; }
+                            htmlContent += `<h2 class="text-xl font-bold mt-6 mb-2 text-purple-700">${line.substring(3)}</h2>`;
+                        } else if (line.startsWith('- ')) {
+                            if (!inList) { htmlContent += `<ul class="list-disc pl-5 mt-2 space-y-2">`; inList = true; }
+                            htmlContent += `<li>${line.substring(2)}</li>`;
+                        } else if (line.trim() !== '') {
+                            if (inList) { htmlContent += `</ul>`; inList = false; }
+                            htmlContent += `<p class="mt-2">${line}</p>`;
+                        }
+                    });
+                    if (inList) htmlContent += `</ul>`;
+                    summaryContent.innerHTML = htmlContent;
+                } else { throw new Error('Invalid AI response structure'); }
+            } catch (error) {
+                console.error('Erro ao chamar a API Gemini:', error);
+                summaryContent.innerHTML = `<p class="text-center text-red-600">Não foi possível gerar o resumo. Verifique sua conexão e tente novamente.</p>`;
+            }
+        };
+
+        addTaskBtn.addEventListener('click', () => toggleModal(null, false));
+        cancelBtn.addEventListener('click', () => toggleModal());
+        generateAIBtn.addEventListener('click', handleAIGeneration);
+        generateSummaryBtn.addEventListener('click', handleSummaryGeneration);
+        closeSummaryBtn.addEventListener('click', () => summaryModal.classList.add('hidden'));
+
+        // --- Core Kanban Logic (Storage, Rendering, Drag-n-Drop) ---
+        const getStorageKey = (boardId) => `kanbanTasks_v4_${boardId}`;
+        const getInitialFlagKey = (boardId) => `initialTasksLoaded_v4_${boardId}`;
+        
+        const saveTasks = () => {
+            if (activeBoardId === 'consolidado') return;
+            const tasks = { todo: [], doing: [], done: [] };
+            Object.keys(columns).forEach(columnId => {
+                const columnTasks = columns[columnId].querySelectorAll('.task-card');
+                columnTasks.forEach(card => tasks[columnId].push(card.dataset));
+            });
+            localStorage.setItem(getStorageKey(activeBoardId), JSON.stringify(tasks));
+        };
+
+        const formatDate = (dateString) => {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date);
+        };
+
+        const createTaskCard = (task) => {
+            const { id, tarefa, solicitante, dataSolicitacao, dataAgendamento, dataEntrega, observacoes, boardName, checklist } = task;
+            const card = document.createElement('div');
+            card.id = id;
+            const isConsolidatedView = activeBoardId === 'consolidado';
+            card.draggable = !isConsolidatedView;
+            card.className = `task-card bg-white p-3 rounded-md shadow-sm border ${isConsolidatedView ? 'no-drag' : ''}`;
+            Object.keys(task).forEach(key => { card.dataset[key] = task[key] || '' });
+
+            const detailHTML = (icon, label, value) => value ? `<div class="task-detail mt-1"><i class="fas ${icon}"></i><span>${label}: <strong>${value}</strong></span></div>` : '';
+            const boardLabelHTML = isConsolidatedView && boardName ? `<div class="mt-2 pt-2 border-t border-gray-200 text-right"><span class="text-xs font-medium text-gray-500 bg-gray-200 px-2 py-1 rounded-full">${boardName}</span></div>` : '';
+            const controlsHTML = !isConsolidatedView ? `<div class="card-controls absolute top-2 right-2 flex gap-2"><button class="duplicate-task-btn text-gray-400 hover:text-green-600 text-xs" title="Duplicar Tarefa"><i class="fas fa-clone"></i></button><button class="edit-task-btn text-gray-400 hover:text-blue-600 text-xs" title="Editar Tarefa"><i class="fas fa-pencil"></i></button><button class="delete-task-btn text-gray-400 hover:text-red-600 text-xs" title="Excluir Tarefa"><i class="fas fa-trash"></i></button></div>` : '';
+
+            let checklistHTML = '';
+            if (checklist) {
+                try {
+                    const checklistData = JSON.parse(checklist);
+                    if (checklistData.length > 0) {
+                        const checkedItems = checklistData.filter(item => item.checked).length;
+                        const progress = Math.round((checkedItems / checklistData.length) * 100);
+                        checklistHTML = `
+                            <div class="mt-3 pt-2 border-t border-dashed">
+                                <div class="flex justify-between items-center text-xs text-gray-600 mb-1">
+                                    <span>Checklist</span>
+                                    <span>${checkedItems}/${checklistData.length}</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-1.5"><div class="bg-green-500 h-1.5 rounded-full" style="width: ${progress}%"></div></div>
+                                <div class="checklist-details mt-2 space-y-1 text-xs text-gray-700">
+                                    ${checklistData.map(item => `
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas ${item.checked ? 'fa-check-square text-green-500' : 'fa-square text-gray-400'}"></i>
+                                            <span class="${item.checked ? 'line-through text-gray-500' : ''}">${item.text}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>`;
+                    }
+                } catch(e) { console.error("Could not parse checklist on card", e); }
+            }
+
+            const observacoesHTML = observacoes ? `<div class="task-observations text-xs text-gray-600 mt-2 pt-2 border-t border-dashed">${observacoes}</div>` : '';
+
+            card.innerHTML = `<div class="relative"><h4 class="font-semibold text-gray-800 pr-12">${tarefa}</h4>${controlsHTML}${detailHTML('fa-user', 'Solicitante', solicitante)}<div class="mt-2 pt-2 border-t border-dashed space-y-1">${detailHTML('fa-calendar-plus', 'Solicitado', formatDate(dataSolicitacao))}${detailHTML('fa-calendar-day', 'Agendado', formatDate(dataAgendamento))}${detailHTML('fa-calendar-check', 'Entregue', formatDate(dataEntrega))}</div>${observacoesHTML}${checklistHTML}${boardLabelHTML}</div>`;
+
+            if (!isConsolidatedView) {
+                card.querySelector('.delete-task-btn').addEventListener('click', e => { e.stopPropagation(); if (confirm(`Excluir a tarefa "${tarefa}"?`)) { card.remove(); saveTasks(); updateGlobalDashboard(); } });
+                card.querySelector('.edit-task-btn').addEventListener('click', e => { e.stopPropagation(); toggleModal(card.dataset, false); });
+                card.querySelector('.duplicate-task-btn').addEventListener('click', e => { e.stopPropagation(); toggleModal(card.dataset, true); });
+                card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', id); setTimeout(() => card.classList.add('opacity-50'), 0); });
+                card.addEventListener('dragend', () => card.classList.remove('opacity-50'));
+            }
+            return card;
+        };
+        
+        const getInitialTasks = (boardId) => {
+            if (localStorage.getItem(getInitialFlagKey(boardId))) return { todo: [], doing: [], done: [] };
+            localStorage.setItem(getInitialFlagKey(boardId), 'true');
+            const now = Date.now();
+            switch (boardId) {
+                case 'geral': return { todo: [{ id: `task-${now+1}`, tarefa: 'CRM - Tutoria + Relatório', solicitante: 'Augusto Bezerra', dataSolicitacao: '2025-10-14' }], doing: [], done: [] };
+                case 'planejamento': return { todo: [{ id: `task-${now+2}`, tarefa: 'Análise de Clientes', solicitante: 'Andreia de Deus', dataAgendamento: '2025-11-30', dataSolicitacao: '2025-09-12' }, { id: `task-${now+3}`, tarefa: 'Maiores Prescritores', solicitante: 'Natalia Andrade', dataAgendamento: '2025-10-14', dataSolicitacao: '2025-10-09' }], doing: [], done: [] };
+                case 'plano-acao': return { todo: [], doing: [{ id: `task-${now+4}`, tarefa: 'Análise de Estoque', solicitante: 'Augusto Bezerra', dataAgendamento: '2025-10-25', dataSolicitacao: '2025-10-01', checklist: JSON.stringify([{text: 'Coletar dados do sistema', checked: true},{text: 'Analisar produtos parados', checked: false},{text: 'Criar relatório de sugestões', checked: false}]) }], done: [{ id: `task-${now+5}`, tarefa: 'Plano de Ação', solicitante: 'Marcos Pagnussat', dataSolicitacao: '2025-09-20', dataEntrega: '2025-10-10' }] };
+                default: return { todo: [], doing: [], done: [] };
+            }
+        };
+
+        const getAllTasksWithDetails = () => {
+            const allTasksList = [];
+            boards.forEach(board => {
+                if (board.id === 'consolidado') return;
+                const boardTasks = JSON.parse(localStorage.getItem(getStorageKey(board.id))) || getInitialTasks(board.id);
+                if(boardTasks.todo) boardTasks.todo.forEach(t => allTasksList.push({ ...t, status: 'todo', boardId: board.id }));
+                if(boardTasks.doing) boardTasks.doing.forEach(t => allTasksList.push({ ...t, status: 'doing', boardId: board.id }));
+                if(boardTasks.done) boardTasks.done.forEach(t => allTasksList.push({ ...t, status: 'done', boardId: board.id }));
+            });
+            return allTasksList;
+        };
+
+        const getAllTasks = () => {
+            const allTasksList = [];
+            boards.forEach(board => {
+                if (board.id === 'consolidado') return;
+                const boardTasks = JSON.parse(localStorage.getItem(getStorageKey(board.id))) || getInitialTasks(board.id);
+                if(boardTasks.todo) boardTasks.todo.forEach(t => allTasksList.push({ ...t, status: 'A Fazer' }));
+                if(boardTasks.doing) boardTasks.doing.forEach(t => allTasksList.push({ ...t, status: 'Em Andamento' }));
+                if(boardTasks.done) boardTasks.done.forEach(t => allTasksList.push({ ...t, status: 'Concluída' }));
+            });
+            return allTasksList;
+        };
+        
+        const updateGlobalDashboard = () => {
+            const allTasks = getAllTasks();
+            const todoCount = allTasks.filter(t => t.status === 'A Fazer').length;
+            const doingCount = allTasks.filter(t => t.status === 'Em Andamento').length;
+            const doneCount = allTasks.filter(t => t.status === 'Concluída').length;
+            
+            document.getElementById('total-tasks').textContent = allTasks.length;
+            document.getElementById('todo-tasks').textContent = todoCount;
+            document.getElementById('doing-tasks').textContent = doingCount;
+            document.getElementById('done-tasks').textContent = doneCount;
+        };
+        
+        const calculatePrazo = (task) => {
+            if (task.status === 'Concluída' && task.dataEntrega) {
+                return `<span class="text-green-700">Entregue em ${formatDate(task.dataEntrega)}</span>`;
+            }
+            if (!task.dataAgendamento) {
+                return '<span class="text-gray-500">Não agendado</span>';
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dueDate = new Date(task.dataAgendamento + 'T00:00:00');
+            
+            const diffTime = dueDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays > 30) {
+                const diffMonths = Math.floor(diffDays / 30);
+                return `<span class="text-green-600">~${diffMonths} ${diffMonths > 1 ? 'meses' : 'mês'}</span>`;
+            }
+            if (diffDays > 1) {
+                return `<span class="text-blue-600">${diffDays} dias restantes</span>`;
+            }
+            if (diffDays === 1) {
+                return `<span class="text-yellow-600 font-semibold">Vence amanhã</span>`;
+            }
+            if (diffDays === 0) {
+                return `<span class="text-orange-600 font-bold">Vence hoje</span>`;
+            }
+            if (diffDays < 0) {
+                return `<span class="text-red-600 font-bold">Atrasado há ${-diffDays} ${-diffDays > 1 ? 'dias' : 'dia'}</span>`;
+            }
+            return '<span class="text-gray-500">Data inválida</span>';
+        };
+        
+        const renderConsolidatedTable = () => {
+            const consolidatedView = document.getElementById('consolidated-view');
+            const allTasks = getAllTasks();
+            
+            if (allTasks.length === 0) {
+                consolidatedView.innerHTML = '<p class="text-center text-gray-500 p-8">Nenhuma tarefa encontrada em todos os painéis.</p>';
+                return;
+            }
+
+            let tableHTML = `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Solicitante</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarefa</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prazo</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">`;
+
+            allTasks.forEach(task => {
+                const statusColors = {
+                    'A Fazer': 'bg-orange-100 text-orange-800',
+                    'Em Andamento': 'bg-blue-100 text-blue-800',
+                    'Concluída': 'bg-green-100 text-green-800'
+                };
+                tableHTML += `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${task.solicitante || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${task.tarefa}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">${calculatePrazo(task)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[task.status]}">
+                                ${task.status}
+                            </span>
+                        </td>
+                    </tr>`;
+            });
+
+            tableHTML += `</tbody></table></div>`;
+            consolidatedView.innerHTML = tableHTML;
+        };
+
+        const switchBoard = (boardId) => {
+            activeBoardId = boardId;
+            const board = boards.find(b => b.id === boardId);
+            boardTitle.textContent = board.name;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.boardId === boardId));
+            
+            const isConsolidatedView = boardId === 'consolidado';
+            const kanbanBoard = document.getElementById('kanban-board');
+            const consolidatedView = document.getElementById('consolidated-view');
+
+            addTaskBtn.style.display = isConsolidatedView ? 'none' : 'flex';
+            clearAllBtn.style.display = isConsolidatedView ? 'none' : 'flex';
+            importBtn.style.display = isConsolidatedView ? 'none' : 'flex';
+            exportBtn.style.display = isConsolidatedView ? 'none' : 'flex';
+
+            generateSummaryBtn.style.display = 'flex';
+            
+            kanbanBoard.style.display = isConsolidatedView ? 'none' : 'flex';
+            consolidatedView.style.display = isConsolidatedView ? 'block' : 'none';
+
+
+            if (isConsolidatedView) {
+                renderConsolidatedTable();
+            } else {
+                Object.values(columns).forEach(col => col.innerHTML = '');
+                const tasks = JSON.parse(localStorage.getItem(getStorageKey(boardId))) || getInitialTasks(boardId);
+                Object.keys(tasks).forEach(columnId => {
+                    if (columns[columnId]) tasks[columnId].forEach(task => columns[columnId].appendChild(createTaskCard(task)));
+                });
+            }
+            updateGlobalDashboard();
+        };
+
+        const renderTabs = () => {
+            tabsContainer.innerHTML = '';
+            boards.forEach(board => {
+                const tab = document.createElement('button');
+                tab.className = 'tab-btn flex-1 text-gray-600 py-3 px-2 border-b-2 border-transparent text-sm md:text-base';
+                tab.textContent = board.name;
+                tab.dataset.boardId = board.id;
+                tab.addEventListener('click', () => switchBoard(board.id));
+                tabsContainer.appendChild(tab);
+            });
+        };
+
+        taskForm.addEventListener('submit', e => {
+            e.preventDefault();
+            const taskId = document.getElementById('taskId').value;
+            const taskData = {
+                id: taskId || `task-${Date.now()}`,
+                tarefa: document.getElementById('taskTarefa').value,
+                solicitante: document.getElementById('taskSolicitante').value,
+                dataSolicitacao: document.getElementById('taskDataSolicitacao').value,
+                dataAgendamento: document.getElementById('taskDataAgendamento').value,
+                dataEntrega: document.getElementById('taskDataEntrega').value,
+                observacoes: document.getElementById('taskObservacoes').innerHTML,
+                checklist: JSON.stringify(getChecklistDataFromModal())
+            };
+            if (taskId) document.getElementById(taskId)?.remove();
+            const newCard = createTaskCard(taskData);
+            if (taskData.dataEntrega) {
+                columns.done.appendChild(newCard);
+            } else {
+                let placed = false;
+                if (taskId) {
+                    const tasks = JSON.parse(localStorage.getItem(getStorageKey(activeBoardId)));
+                    for (const col in tasks) {
+                        if (tasks[col]?.some(t => t.id === taskId)) { columns[col].appendChild(newCard); placed = true; break; }
+                    }
+                }
+                if (!placed) columns.todo.appendChild(newCard);
+            }
+            saveTasks();
+            updateGlobalDashboard();
+            toggleModal();
+        });
+
+        taskColumns.forEach(column => {
+            column.addEventListener('dragover', e => { if (activeBoardId !== 'consolidado') e.preventDefault(); column.classList.add('drag-over'); });
+            column.addEventListener('dragleave', () => column.classList.remove('drag-over'));
+            column.addEventListener('drop', e => {
+                if (activeBoardId === 'consolidado') return;
+                e.preventDefault();
+                column.classList.remove('drag-over');
+                const cardId = e.dataTransfer.getData('text/plain');
+                const draggedCard = document.getElementById(cardId);
+                if (draggedCard) {
+                    column.querySelector('.task-list').appendChild(draggedCard);
+                    saveTasks();
+                    updateGlobalDashboard();
+                }
+            });
+        });
+
+        clearAllBtn.addEventListener('click', () => {
+            const board = boards.find(b => b.id === activeBoardId);
+            if (confirm(`Atenção! Isso removerá TODAS as tarefas do painel "${board.name}". Deseja continuar?`)) {
+                Object.values(columns).forEach(column => column.innerHTML = '');
+                localStorage.removeItem(getStorageKey(activeBoardId));
+                localStorage.removeItem(getInitialFlagKey(activeBoardId));
+                updateGlobalDashboard();
+                switchBoard(activeBoardId);
+            }
+        });
+
+        // --- Import/Export Logic ---
+        const exportTasksToCSV = () => {
+            const allTasks = getAllTasksWithDetails();
+            if (allTasks.length === 0) {
+                alert('Nenhuma tarefa para exportar.');
+                return;
+            }
+
+            const headers = ['boardId', 'status', 'id', 'tarefa', 'solicitante', 'dataSolicitacao', 'dataAgendamento', 'dataEntrega', 'observacoes_b64', 'checklist_b64'];
+            
+            const csvRows = allTasks.map(task => {
+                const row = [
+                    task.boardId,
+                    task.status,
+                    task.id,
+                    `"${(task.tarefa || '').replace(/"/g, '""')}"`,
+                    `"${(task.solicitante || '').replace(/"/g, '""')}"`,
+                    task.dataSolicitacao,
+                    task.dataAgendamento,
+                    task.dataEntrega,
+                    btoa(unescape(encodeURIComponent(task.observacoes || ''))),
+                    btoa(unescape(encodeURIComponent(task.checklist || '')))
+                ];
+                return row.join(';');
+            });
+
+            const csvString = ["sep=;", headers.join(';'), ...csvRows].join('\n');
+            
+            const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'backup_tarefas.csv');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        };
+
+        const importTasksFromCSV = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!confirm('Atenção: A importação substituirá TODAS as tarefas existentes. O arquivo deve usar ; como separador e seguir o formato do modelo exportado. Deseja continuar?')) {
+                event.target.value = ''; 
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n').filter(row => row.trim() !== '');
+                
+                if (rows.length < 1) {
+                    alert('Arquivo CSV inválido ou vazio.');
+                    return;
+                }
+                
+                let headerRowIndex = 0;
+                if (rows.length > 1 && rows[0].trim().toLowerCase().startsWith('sep=')) {
+                    headerRowIndex = 1;
+                }
+
+                if (rows.length <= headerRowIndex) {
+                    alert('Arquivo CSV não contém um cabeçalho válido.');
+                    return;
+                }
+                
+                const headers = rows[headerRowIndex].trim().split(';');
+                const requiredHeaders = ['boardId', 'status', 'id', 'tarefa'];
+                if (!requiredHeaders.every(h => headers.includes(h))) {
+                    alert(`Arquivo CSV inválido. Faltando cabeçalhos necessários: ${requiredHeaders.join(', ')}`);
+                    return;
+                }
+
+                const newAllTasks = {};
+                boards.forEach(b => {
+                    if (b.id !== 'consolidado') newAllTasks[b.id] = { todo: [], doing: [], done: [] };
+                });
+
+                for (let i = headerRowIndex + 1; i < rows.length; i++) {
+                    const values = rows[i].trim().split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    const taskData = {};
+                    headers.forEach((header, index) => {
+                         let value = values[index] || '';
+                         if (value.startsWith('"') && value.endsWith('"')) {
+                            value = value.slice(1, -1).replace(/""/g, '"');
+                         }
+                         taskData[header] = value;
+                    });
+
+                    try {
+                       taskData.observacoes = decodeURIComponent(escape(atob(taskData.observacoes_b64 || '')));
+                       taskData.checklist = decodeURIComponent(escape(atob(taskData.checklist_b64 || '')));
+                    } catch(e) {
+                       console.warn("Could not decode base64 content for task", taskData.id, e);
+                       taskData.observacoes = '';
+                       taskData.checklist = '';
+                    }
+                    
+                    const { boardId, status } = taskData;
+                    if (newAllTasks[boardId] && newAllTasks[boardId][status]) {
+                        newAllTasks[boardId][status].push(taskData);
+                    } else {
+                        console.warn(`Painel ou status inválido no arquivo CSV para a tarefa ${taskData.id}: board='${boardId}', status='${status}'`);
+                    }
+                }
+
+                // Clear old data and save new data
+                boards.forEach(b => {
+                    if (b.id !== 'consolidado') {
+                        localStorage.setItem(getStorageKey(b.id), JSON.stringify(newAllTasks[b.id]));
+                        localStorage.setItem(getInitialFlagKey(b.id), 'true');
+                    }
+                });
+
+                // Refresh view
+                switchBoard(activeBoardId === 'consolidado' ? 'geral' : activeBoardId);
+                alert('Tarefas importadas com sucesso!');
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset file input
+        };
+
+        importBtn.addEventListener('click', () => importFile.click());
+        importFile.addEventListener('change', importTasksFromCSV);
+        exportBtn.addEventListener('click', exportTasksToCSV);
+
+        // Initial setup
+        renderTabs();
+        switchBoard(activeBoardId);
+    </script>
+</body>
+</html>
