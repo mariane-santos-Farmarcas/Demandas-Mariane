@@ -105,9 +105,10 @@
         </header>
 
         <nav id="tabs-container" class="flex border-b border-gray-300 mb-6 bg-gray-200 rounded-t-lg p-1 overflow-x-auto">
-            <!-- Tabs serão inseridas aqui -->
+            <!-- Tabs dinâmicas -->
         </nav>
 
+        <!-- Painel de Produtividade -->
         <section id="productivity-dashboard" class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-500">
                 <h2 class="text-sm font-medium text-gray-500">Total de Tarefas</h2>
@@ -127,6 +128,7 @@
             </div>
         </section>
 
+        <!-- Controles Principais -->
         <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
              <div class="flex flex-wrap gap-2">
                 <button id="addTaskBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors flex items-center gap-2">
@@ -148,6 +150,7 @@
             </button>
         </div>
 
+        <!-- Kanban Board -->
         <main id="kanban-board" class="flex gap-6 overflow-x-auto pb-4">
             <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 min-w-[20rem] sm:w-96 sm:min-w-[24rem] flex-shrink-0" data-column-id="todo">
                 <h3 class="font-bold text-lg mb-4 text-orange-600 flex items-center gap-2"><i class="fas fa-list-check"></i>A Fazer</h3>
@@ -164,35 +167,35 @@
         </main>
         
         <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md p-2">
-            <!-- Tabela Consolidada -->
+            <!-- Tabela de resumo gerada dinamicamente -->
         </div>
     </div>
 
-    <!-- Modal Adicionar/Editar -->
+    <!-- Modal de Tarefa -->
     <div id="taskModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
         <div class="bg-white p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-lg m-4 max-h-[90vh] overflow-y-auto">
-            <h2 id="modalTitle" class="text-2xl font-bold mb-6">Nova Tarefa</h2>
+            <h2 id="modalTitle" class="text-2xl font-bold mb-6 text-gray-800">Nova Tarefa</h2>
             <form id="taskForm">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="mb-4">
                         <label class="block text-gray-700 font-medium mb-1">Tarefa</label>
-                        <input type="text" id="taskTarefa" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" required>
+                        <input type="text" id="taskTarefa" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" required>
                     </div>
                      <div class="mb-4">
                         <label class="block text-gray-700 font-medium mb-1">Solicitante</label>
-                        <input type="text" id="taskSolicitante" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="taskSolicitante" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
                     </div>
                     <div class="mb-4">
                         <label class="block text-gray-700 font-medium mb-1">Data da Solicitação</label>
-                        <input type="date" id="taskDataSolicitacao" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        <input type="date" id="taskDataSolicitacao" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
                     </div>
                     <div class="mb-4">
                         <label class="block text-gray-700 font-medium mb-1">Data de Agendamento</label>
-                        <input type="date" id="taskDataAgendamento" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        <input type="date" id="taskDataAgendamento" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
                     </div>
                      <div class="mb-4 col-span-1 md:col-span-2">
                         <label class="block text-gray-700 font-medium mb-1">Data da Entrega</label>
-                        <input type="date" id="taskDataEntrega" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        <input type="date" id="taskDataEntrega" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
                     </div>
                     <div class="mb-4 col-span-1 md:col-span-2">
                         <div class="flex justify-between items-center mb-1">
@@ -201,15 +204,15 @@
                                 ✨ Gerar com IA
                             </button>
                         </div>
-                        <div id="taskObservacoes" contenteditable="true" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 min-h-[100px] overflow-y-auto bg-white"></div>
-                        <p class="text-[10px] text-gray-400 mt-1">Dica: você pode colar imagens aqui.</p>
+                        <div id="taskObservacoes" contenteditable="true" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 min-h-[100px] overflow-y-auto bg-white focus:outline-none"></div>
+                        <p class="text-[10px] text-gray-400 mt-1">Dica: você pode colar imagens (Ctrl+V) nas observações.</p>
                     </div>
                     <div class="mb-4 col-span-1 md:col-span-2 border-t pt-4">
                         <label class="block text-gray-700 font-medium mb-1">Checklist de Ações</label>
                         <div id="checklist-container" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-1"></div>
                         <div class="flex gap-2">
-                            <input type="text" id="checklistItemInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Nova ação...">
-                            <button type="button" id="addChecklistItemBtn" class="bg-blue-100 text-blue-600 py-2 px-3 rounded-lg hover:bg-blue-200"><i class="fas fa-plus"></i></button>
+                            <input type="text" id="checklistItemInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Adicionar ação...">
+                            <button type="button" id="addChecklistItemBtn" class="bg-blue-100 text-blue-600 py-2 px-3 rounded-lg hover:bg-blue-200 transition-colors"><i class="fas fa-plus"></i></button>
                         </div>
                     </div>
                 </div>
@@ -233,10 +236,10 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase Scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         // Configuração Firebase
@@ -246,11 +249,11 @@
         const auth = getAuth(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-board-app';
 
-        // Configuração API Gemini
+        // Configuração Gemini API
         const apiKey = "";
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
-        // Estado da aplicação
+        // Estado da Aplicação
         let allTasksFromDB = [];
         let currentBoardId = 'geral';
         const boards = [
@@ -288,7 +291,7 @@
             done: document.getElementById('done-list')
         };
 
-        // --- Firebase Core ---
+        // --- Firebase Auth & Sync ---
 
         const initApp = async () => {
             try {
@@ -319,8 +322,6 @@
             });
         };
 
-        // --- Data Actions ---
-
         const saveTaskToFirebase = async (taskData) => {
             const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskData.id);
             await setDoc(taskRef, taskData);
@@ -331,7 +332,7 @@
             await deleteDoc(taskRef);
         };
 
-        // --- Rendering ---
+        // --- UI Rendering ---
 
         const renderTabs = () => {
             tabsContainer.innerHTML = '';
@@ -415,7 +416,7 @@
                     ${task.dataAgendamento ? `<div class="task-detail"><i class="fas fa-calendar-day text-[10px]"></i><span class="text-[10px]">Agendado: ${formatDateStr(task.dataAgendamento)}</span></div>` : ''}
                     ${task.dataEntrega ? `<div class="task-detail"><i class="fas fa-check-circle text-[10px] text-green-500"></i><span class="text-[10px] font-bold text-green-600">Entregue: ${formatDateStr(task.dataEntrega)}</span></div>` : ''}
                 </div>
-                ${task.observacoes ? `<div class="task-observations text-[10px] text-gray-500 mt-2 line-clamp-2 overflow-hidden text-left">${task.observacoes}</div>` : ''}
+                ${task.observacoes ? `<div class="task-observations text-[10px] text-gray-500 mt-2 line-clamp-3 overflow-hidden text-left">${task.observacoes}</div>` : ''}
                 ${checklistSummary}
             `;
 
@@ -446,16 +447,17 @@
             today.setHours(0,0,0,0);
 
             let html = `
-                <table class="w-full text-left text-sm border-collapse">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <th class="p-3 border">Solicitante</th>
-                            <th class="p-3 border">Tarefa</th>
-                            <th class="p-3 border">Prazo</th>
-                            <th class="p-3 border">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm border-collapse min-w-[600px]">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="p-3 border">Solicitante</th>
+                                <th class="p-3 border">Tarefa</th>
+                                <th class="p-3 border">Prazo</th>
+                                <th class="p-3 border">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
             
             allTasksFromDB.forEach(t => {
                 let prazoHtml = '-';
@@ -475,8 +477,8 @@
 
                 html += `
                     <tr>
-                        <td class="p-3 border">${t.solicitante || '-'}</td>
-                        <td class="p-3 border font-medium">${t.tarefa}</td>
+                        <td class="p-3 border text-gray-600">${t.solicitante || '-'}</td>
+                        <td class="p-3 border font-medium text-gray-800">${t.tarefa}</td>
                         <td class="p-3 border">${prazoHtml}</td>
                         <td class="p-3 border">
                             <span class="px-2 py-1 rounded-full text-[10px] font-bold ${colorMap[t.status]}">${statusMap[t.status]}</span>
@@ -484,7 +486,7 @@
                     </tr>`;
             });
 
-            html += `</tbody></table>`;
+            html += `</tbody></table></div>`;
             consolidatedView.innerHTML = html;
         };
 
@@ -516,7 +518,7 @@
             });
         });
 
-        // --- Modal Logic ---
+        // --- Modal ---
 
         const openModal = (task = null, isDup = false) => {
             taskForm.reset();
@@ -577,7 +579,6 @@
         taskForm.onsubmit = async (e) => {
             e.preventDefault();
             const id = document.getElementById('taskId').value;
-            const tarefa = document.getElementById('taskTarefa').value;
             const dataEntrega = document.getElementById('taskDataEntrega').value;
             const checklist = [];
             checklistContainer.querySelectorAll('div.flex').forEach(item => {
@@ -589,7 +590,7 @@
             let status = originalTask ? originalTask.status : 'todo';
             if (dataEntrega) status = 'done';
             const taskData = {
-                id, boardId: currentBoardId, status, tarefa,
+                id, boardId: currentBoardId, status, tarefa: document.getElementById('taskTarefa').value,
                 solicitante: document.getElementById('taskSolicitante').value,
                 dataSolicitacao: document.getElementById('taskDataSolicitacao').value,
                 dataAgendamento: document.getElementById('taskDataAgendamento').value,
@@ -603,7 +604,7 @@
         cancelBtn.onclick = () => taskModal.classList.add('hidden');
         addTaskBtn.onclick = () => openModal();
 
-        // --- AI ---
+        // --- IA Helpers ---
 
         const callGemini = async (prompt, system) => {
             const payload = { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: system }] } };
@@ -617,10 +618,10 @@
             generateAIBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             generateAIBtn.disabled = true;
             try {
-                const data = await callGemini(`Gere 5 subtarefas para: "${title}"`, "Retorne apenas uma lista simples de ações curtas separadas por quebra de linha.");
+                const data = await callGemini(`Gere 5 subtarefas curtas para: "${title}"`, "Retorne apenas uma lista simples de ações curtas separadas por quebra de linha, sem números.");
                 const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (text) text.split('\n').filter(l => l.trim()).forEach(l => addChecklistItem(l.trim().replace(/^[\d.-]\s*/, '')));
-            } catch (err) { alert("IA indisponível."); }
+            } catch (err) { alert("IA temporariamente indisponível."); }
             generateAIBtn.innerHTML = '✨ Gerar com IA';
             generateAIBtn.disabled = false;
         };
@@ -628,25 +629,31 @@
         generateSummaryBtn.onclick = async () => {
             summaryModal.classList.remove('hidden');
             summaryModal.classList.add('flex');
-            summaryContent.innerHTML = '<div class="text-center p-8"><i class="fas fa-spinner fa-spin text-3xl text-purple-500"></i><p class="mt-4">Analisando...</p></div>';
+            summaryContent.innerHTML = '<div class="text-center p-8"><i class="fas fa-spinner fa-spin text-3xl text-purple-500"></i><p class="mt-4 text-gray-600">IA analisando sua produtividade...</p></div>';
             const tasksStr = allTasksFromDB.map(t => `- ${t.tarefa} (${t.status})`).join('\n');
             try {
-                const data = await callGemini(`Analise estas tarefas e dê um resumo motivacional:\n${tasksStr}`, "Aja como coach sênior. Responda em Português Brasileiro, formate com HTML simples.");
-                summaryContent.innerHTML = data.candidates?.[0]?.content?.parts?.[0]?.text || "Erro no resumo.";
-            } catch (err) { summaryContent.innerHTML = "IA falhou."; }
+                const data = await callGemini(`Analise estas tarefas e dê um resumo motivacional curto:\n${tasksStr}`, "Aja como coach de produtividade. Responda em Português Brasileiro, formate com HTML simples (p, b, ul, li).");
+                summaryContent.innerHTML = data.candidates?.[0]?.content?.parts?.[0]?.text || "Não foi possível gerar o resumo.";
+            } catch (err) { summaryContent.innerHTML = "Falha na conexão com a IA."; }
         };
 
         closeSummaryBtn.onclick = () => summaryModal.classList.add('hidden');
 
-        // --- Export/Import ---
+        // --- CSV Operations ---
 
         exportBtn.onclick = () => {
             const headers = "boardId;status;id;tarefa;solicitante;dataSolicitacao;dataAgendamento;dataEntrega;observacoes_b64;checklist_b64";
-            const rows = allTasksFromDB.map(t => [t.boardId, t.status, t.id, `"${t.tarefa.replace(/"/g, '""')}"`, `"${(t.solicitante || '').replace(/"/g, '""')}"`, t.dataSolicitacao || '', t.dataAgendamento || '', t.dataEntrega || '', btoa(unescape(encodeURIComponent(t.observacoes || ''))), btoa(unescape(encodeURIComponent(t.checklist || '')))].join(';'));
+            const rows = allTasksFromDB.map(t => [
+                t.boardId, t.status, t.id, 
+                `"${t.tarefa.replace(/"/g, '""')}"`, `"${(t.solicitante || '').replace(/"/g, '""')}"`,
+                t.dataSolicitacao || '', t.dataAgendamento || '', t.dataEntrega || '',
+                btoa(unescape(encodeURIComponent(t.observacoes || ''))),
+                btoa(unescape(encodeURIComponent(t.checklist || '')))
+            ].join(';'));
             const csv = "sep=;\n" + headers + "\n" + rows.join("\n");
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' }));
-            a.download = "backup_tarefas.csv";
+            a.download = "backup_nuvem_tarefas.csv";
             a.click();
         };
 
@@ -657,6 +664,7 @@
             const reader = new FileReader();
             reader.onload = async (event) => {
                 const lines = event.target.result.split('\n').filter(l => l.trim() && !l.startsWith('sep='));
+                if(lines.length < 2) return alert("Arquivo vazio.");
                 const headers = lines[0].split(';');
                 for (let i = 1; i < lines.length; i++) {
                     const values = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/);
@@ -673,13 +681,13 @@
                     } catch(ex) {}
                     await saveTaskToFirebase(data);
                 }
-                alert("Tarefas importadas!");
+                alert("Importação concluída com sucesso!");
             };
             reader.readAsText(file);
         };
 
         clearAllBtn.onclick = async () => {
-            if (confirm(`Apagar todas as tarefas deste painel?`)) {
+            if (confirm(`Tem certeza que deseja apagar TODAS as tarefas deste painel?`)) {
                 allTasksFromDB.filter(t => t.boardId === currentBoardId).forEach(async t => await deleteTaskFromFirebase(t.id));
             }
         };
