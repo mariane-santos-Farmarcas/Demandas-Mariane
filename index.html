@@ -1,183 +1,84 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Painel de Tarefas Interativo</title>
+<!-- Firebase COMPAT (GitHub Pages SAFE) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+/* ===============================
+   🔐 CONFIG FIREBASE
+   =============================== */
+const firebaseConfig = {
+    apiKey: "SUA_API_KEY",
+    authDomain: "SEU_PROJETO.firebaseapp.com",
+    projectId: "SEU_PROJETO",
+    storageBucket: "SEU_PROJETO.appspot.com",
+    messagingSenderId: "XXXXXXX",
+    appId: "SEU_APP_ID"
+};
 
-    <style>
-        body { font-family: 'Inter', sans-serif; background:#f0f2f5 }
-        .task-card { cursor: grab; transition:.2s }
-        .card-controls { opacity:0; transition:.2s }
-        .task-card:hover .card-controls { opacity:1 }
-        .task-column.drag-over { border:2px dashed #3b82f6; background:#eff6ff }
-    </style>
-</head>
+firebase.initializeApp(firebaseConfig);
 
-<body class="p-4 md:p-8">
-<div id="custom-message"></div>
+const db = firebase.firestore();
+const auth = firebase.auth();
+const appId = "task-board-prod";
 
-<div class="max-w-7xl mx-auto">
-    <h1 id="board-title" class="text-3xl font-bold mb-4">Painel de Tarefas</h1>
-
-    <div class="flex gap-2 mb-6">
-        <button id="addTaskBtn" class="bg-blue-600 text-white px-4 py-2 rounded">+ Tarefa</button>
-        <button id="generateSummaryBtn" class="bg-purple-600 text-white px-4 py-2 rounded">✨ Resumo</button>
-        <button id="clearAllBtn" class="bg-red-500 text-white px-4 py-2 rounded">🗑 Limpar</button>
-    </div>
-
-    <div id="kanban-board" class="flex gap-4">
-        <div class="task-column w-80 bg-gray-100 p-4 rounded" data-column-id="todo">
-            <h3 class="font-bold mb-2 text-orange-600">A Fazer</h3>
-            <div id="todo-list" class="space-y-2 min-h-[200px]"></div>
-        </div>
-
-        <div class="task-column w-80 bg-gray-100 p-4 rounded" data-column-id="doing">
-            <h3 class="font-bold mb-2 text-blue-600">Em Andamento</h3>
-            <div id="doing-list" class="space-y-2 min-h-[200px]"></div>
-        </div>
-
-        <div class="task-column w-80 bg-gray-100 p-4 rounded" data-column-id="done">
-            <h3 class="font-bold mb-2 text-green-600">Concluído</h3>
-            <div id="done-list" class="space-y-2 min-h-[200px]"></div>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL -->
-<div id="taskModal" class="fixed inset-0 hidden items-center justify-center bg-black/50 z-50">
-    <div class="bg-white p-6 rounded w-full max-w-md">
-        <h2 id="modalTitle" class="text-xl font-bold mb-4">Nova Tarefa</h2>
-        <form id="taskForm">
-            <input id="taskTarefa" required placeholder="Título" class="w-full border p-2 mb-3">
-            <input type="hidden" id="taskId">
-            <div class="flex justify-end gap-2">
-                <button type="button" id="cancelBtn">Cancelar</button>
-                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Salvar</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script type="module">
-console.log("JS carregado");
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-/* 🔐 FIREBASE CONFIG (COMPATÍVEL COM GITHUB) */
-const firebaseConfig =
-    typeof __firebase_config !== "undefined"
-        ? JSON.parse(__firebase_config)
-        : {
-            apiKey: "SUA_API_KEY",
-            authDomain: "SEU_PROJETO.firebaseapp.com",
-            projectId: "SEU_PROJETO",
-            storageBucket: "SEU_PROJETO.appspot.com",
-            messagingSenderId: "XXXXXXX",
-            appId: "SEU_APP_ID"
-        };
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-const appId =
-    typeof __app_id !== "undefined"
-        ? __app_id
-        : "github-kanban-board";
-
+/* ===============================
+   🔄 ESTADO GLOBAL
+   =============================== */
 let allTasks = [];
+let currentBoardId = "geral";
 
-/* UTIL */
-const showMsg = (t) => alert(t);
+/* ===============================
+   🧩 UTIL
+   =============================== */
+const showMsg = (txt) => alert(txt);
+const formatDate = d => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : "";
 
-/* CARD */
+/* ===============================
+   🧱 RENDERIZAÇÃO
+   =============================== */
+function renderBoard() {
+    ["todo","doing","done"].forEach(s => {
+        document.getElementById(`${s}-list`).innerHTML = "";
+    });
+
+    allTasks
+        .filter(t => t.boardId === currentBoardId)
+        .forEach(task => {
+            document.getElementById(`${task.status}-list`)
+                .appendChild(createCard(task));
+        });
+}
+
 function createCard(task) {
-    const d = document.createElement("div");
-    d.className = "task-card bg-white p-3 rounded shadow";
-    d.draggable = true;
-    d.innerHTML = `
-        <div class="flex justify-between items-center">
-            <strong>${task.tarefa}</strong>
-            <button class="text-red-500"><i class="fas fa-trash"></i></button>
+    const div = document.createElement("div");
+    div.className = "task-card bg-white p-3 rounded-md shadow-sm border";
+    div.draggable = true;
+    div.id = task.id;
+
+    div.innerHTML = `
+        <div class="card-controls absolute top-2 right-2 flex gap-2">
+            <button class="edit-btn"><i class="fas fa-pencil"></i></button>
+            <button class="del-btn"><i class="fas fa-trash"></i></button>
         </div>
+        <h4 class="font-bold text-sm">${task.tarefa}</h4>
+        ${task.solicitante ? `<div class="text-xs">👤 ${task.solicitante}</div>` : ""}
+        ${task.dataAgendamento ? `<div class="text-xs">📅 ${formatDate(task.dataAgendamento)}</div>` : ""}
+        ${task.observacoes ? `<div class="text-xs text-gray-500 line-clamp-3">${task.observacoes}</div>` : ""}
     `;
-    d.querySelector("button").onclick = () =>
-        deleteDoc(doc(db,"artifacts",appId,"public","data","tasks",task.id));
-    d.ondragstart = e => e.dataTransfer.setData("id",task.id);
-    return d;
-}
 
-/* RENDER */
-function render() {
-    ["todo","doing","done"].forEach(s =>
-        document.getElementById(`${s}-list`).innerHTML=""
-    );
-
-    allTasks.forEach(t =>
-        document.getElementById(`${t.status}-list`)
-            .appendChild(createCard(t))
-    );
-}
-
-/* EVENTS */
-function setupEvents() {
-    addTaskBtn.onclick = () => {
-        taskForm.reset();
-        taskId.value = "task-" + Date.now();
-        taskModal.classList.remove("hidden");
-        taskModal.classList.add("flex");
-    };
-
-    cancelBtn.onclick = () => taskModal.classList.add("hidden");
-
-    taskForm.onsubmit = async e => {
-        e.preventDefault();
-        const data = {
-            id: taskId.value,
-            tarefa: taskTarefa.value,
-            status: "todo"
-        };
-        await setDoc(doc(db,"artifacts",appId,"public","data","tasks",data.id),data);
-        taskModal.classList.add("hidden");
-        showMsg("Tarefa salva");
-    };
-
-    document.querySelectorAll(".task-column").forEach(col=>{
-        col.ondragover = e => e.preventDefault();
-        col.ondrop = async e => {
-            const id = e.dataTransfer.getData("id");
-            const t = allTasks.find(x=>x.id===id);
-            if(t){
-                t.status = col.dataset.columnId;
-                await setDoc(doc(db,"artifacts",appId,"public","data","tasks",id),t);
-            }
-        };
-    });
-}
-
-/* INIT */
-document.addEventListener("DOMContentLoaded", async () => {
-    setupEvents();
-    await signInAnonymously(auth);
-    onAuthStateChanged(auth, user => {
-        if(user){
-            onSnapshot(
-                collection(db,"artifacts",appId,"public","data","tasks"),
-                snap=>{
-                    allTasks = snap.docs.map(d=>({id:d.id,...d.data()}));
-                    render();
-                }
-            );
+    div.querySelector(".del-btn").onclick = () => {
+        if(confirm("Excluir tarefa?")){
+            db.collection("artifacts")
+              .doc(appId)
+              .collection("public")
+              .doc("data")
+              .collection("tasks")
+              .doc(task.id)
+              .delete();
         }
-    });
-});
-</script>
-</body>
-</html>
+    };
+
+    div.querySelector(".edit-btn").onclick = () => openModal(task);
+
+    div.ondragstart = e => e.dataTransfer.set
