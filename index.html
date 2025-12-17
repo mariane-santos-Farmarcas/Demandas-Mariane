@@ -9,113 +9,178 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
-        .task-card { cursor: grab; transition: all 0.2s ease-in-out; }
-        .task-card .card-controls { opacity: 0; transition: opacity 0.2s ease-in-out; }
-        .task-card:hover .card-controls { opacity: 1; }
-        .task-card .checklist-details { display: none; max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
-        .task-card:hover .checklist-details { display: block; max-height: 200px; }
-        .task-card.no-drag { cursor: default; }
-        .task-card:active { cursor: grabbing; transform: scale(1.05); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
-        .task-column.drag-over { border-style: dashed; border-color: #3b82f6; background-color: #eff6ff; }
-        .task-list::-webkit-scrollbar, #kanban-board::-webkit-scrollbar { width: 8px; height: 8px; }
-        .task-list::-webkit-scrollbar-track, #kanban-board::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 10px; }
-        .task-list::-webkit-scrollbar-thumb, #kanban-board::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 10px; border: 2px solid #e2e8f0; }
-        .tab-btn { transition: all 0.2s ease-in-out; }
-        .tab-btn.active { background-color: #ffffff; color: #2563eb; border-bottom-color: #2563eb; font-weight: 600; }
-        .task-detail { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #4a5568; }
-        .task-detail i { width: 14px; text-align: center; }
-        .task-observations img { max-width: 100%; height: auto; border-radius: 0.25rem; margin-top: 0.5rem; }
-        #taskObservacoes img { max-width: 90%; height: auto; display: block; margin: 0.5rem auto; border-radius: 0.25rem; }
+        .task-card { cursor: grab; transition: all 0.2s; }
+        .task-card:active { cursor: grabbing; transform: scale(1.02); }
+        .task-list { min-height: 150px; }
+        .task-column.drag-over { border: 2px dashed #3b82f6; background-color: #eff6ff; }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
     <div class="max-w-7xl mx-auto">
-        <header class="mb-6">
-            <h1 id="board-title" class="text-3xl md:text-4xl font-bold text-gray-800 text-center md:text-left">Painel de Tarefas</h1>
-            <p class="text-gray-500 mt-1 text-center md:text-left">Selecione um painel abaixo para ver e organizar suas tarefas (Sincronizado via Firebase).</p>
+        <header class="mb-6 text-center md:text-left">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Painel de Tarefas</h1>
+            <p class="text-gray-500 mt-1">Sincronizado via Firebase Firestore</p>
         </header>
 
-        <nav id="tabs-container" class="flex border-b border-gray-300 mb-6 bg-gray-200 rounded-t-lg p-1">
-            </nav>
-
-        <section id="productivity-dashboard" class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-500">
-                <h2 class="text-sm font-medium text-gray-500">Total de Tarefas</h2>
-                <p id="total-tasks" class="text-3xl font-bold text-gray-800">0</p>
+        <section class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                <h2 class="text-sm font-medium text-gray-500">Total</h2>
+                <p id="total-tasks" class="text-2xl font-bold">0</p>
             </div>
-            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-orange-500">
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
                 <h2 class="text-sm font-medium text-gray-500">A Fazer</h2>
-                <p id="todo-tasks" class="text-3xl font-bold text-orange-500">0</p>
+                <p id="todo-count" class="text-2xl font-bold text-orange-500">0</p>
             </div>
-            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
-                <h2 class="text-sm font-medium text-gray-500">Em Andamento</h2>
-                <p id="doing-tasks" class="text-3xl font-bold text-blue-500">0</p>
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-400">
+                <h2 class="text-sm font-medium text-gray-500">Fazendo</h2>
+                <p id="doing-count" class="text-2xl font-bold text-blue-500">0</p>
             </div>
-            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
-                <h2 class="text-sm font-medium text-gray-500">Concluídas</h2>
-                <p id="done-tasks" class="text-3xl font-bold text-green-500">0</p>
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
+                <h2 class="text-sm font-medium text-gray-500">Concluído</h2>
+                <p id="done-count" class="text-2xl font-bold text-green-500">0</p>
             </div>
         </section>
 
-        <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
-             <div class="flex flex-wrap gap-2">
-                <button id="addTaskBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors flex items-center gap-2">
-                    <i class="fas fa-plus"></i> Adicionar Tarefa
-                </button>
-                <button id="generateSummaryBtn" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-purple-700 transition-colors flex items-center gap-2">
-                    ✨ Gerar Resumo
-                </button>
-                <button id="importBtn" class="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-teal-700 transition-colors flex items-center gap-2">
-                    <i class="fas fa-upload"></i> Importar
-                </button>
-                <input type="file" id="importFile" class="hidden" accept=".csv">
-                <button id="exportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-700 transition-colors flex items-center gap-2">
-                    <i class="fas fa-download"></i> Exportar / Modelo CSV
-                </button>
-            </div>
-            <button id="clearAllBtn" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-red-600 transition-colors flex items-center gap-2">
-                <i class="fas fa-trash"></i> Limpar Painel Atual
+        <div class="mb-6 flex flex-wrap gap-2">
+            <button onclick="openModal()" class="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
+                <i class="fas fa-plus mr-2"></i>Nova Tarefa
             </button>
         </div>
 
         <main id="kanban-board" class="flex gap-6 overflow-x-auto pb-4">
-            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 sm:w-96 flex-shrink-0" data-column-id="todo">
-                <h3 class="font-bold text-lg mb-4 text-orange-600 flex items-center gap-2"><i class="fas fa-list-check"></i>A Fazer</h3>
-                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="todo-list"></div>
+            <div class="task-column bg-gray-200 rounded-lg p-4 w-80 flex-shrink-0" data-status="todo">
+                <h3 class="font-bold mb-4 text-orange-700 uppercase text-sm tracking-wider">A Fazer</h3>
+                <div id="todo-list" class="task-list space-y-3"></div>
             </div>
-            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 sm:w-96 flex-shrink-0" data-column-id="doing">
-                <h3 class="font-bold text-lg mb-4 text-blue-600 flex items-center gap-2"><i class="fas fa-person-digging"></i>Em Andamento</h3>
-                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="doing-list"></div>
+            <div class="task-column bg-gray-200 rounded-lg p-4 w-80 flex-shrink-0" data-status="doing">
+                <h3 class="font-bold mb-4 text-blue-700 uppercase text-sm tracking-wider">Em Andamento</h3>
+                <div id="doing-list" class="task-list space-y-3"></div>
             </div>
-            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 sm:w-96 flex-shrink-0" data-column-id="done">
-                <h3 class="font-bold text-lg mb-4 text-green-600 flex items-center gap-2"><i class="fas fa-check-double"></i>Concluído</h3>
-                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="done-list"></div>
+            <div class="task-column bg-gray-200 rounded-lg p-4 w-80 flex-shrink-0" data-status="done">
+                <h3 class="font-bold mb-4 text-green-700 uppercase text-sm tracking-wider">Concluído</h3>
+                <div id="done-list" class="task-list space-y-3"></div>
             </div>
         </main>
-        
-        <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md">
-            </div>
-
     </div>
 
     <div id="taskModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-lg m-4 max-h-[90vh] overflow-y-auto">
-            <h2 id="modalTitle" class="text-2xl font-bold mb-6">Nova Tarefa</h2>
-            <form id="taskForm">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="mb-4">
-                        <label for="taskTarefa" class="block text-gray-700 font-medium mb-1">Tarefa</label>
-                        <input type="text" id="taskTarefa" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+        <div class="bg-white p-6 rounded-lg w-full max-w-md shadow-2xl">
+            <h2 class="text-xl font-bold mb-4">Nova Tarefa</h2>
+            <form id="taskForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium">Título da Tarefa</label>
+                    <input type="text" id="taskTitle" class="w-full p-2 border rounded" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Solicitante</label>
+                    <input type="text" id="taskRequester" class="w-full p-2 border rounded">
+                </div>
+                <div class="flex justify-end gap-2 pt-4">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-600">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // CONFIGURAÇÃO DO FIREBASE (COLE AQUI O SEU DO CONSOLE)
+        const firebaseConfig = {
+            apiKey: "SUA_API_KEY",
+            authDomain: "SEU_PROJETO.firebaseapp.com",
+            projectId: "SEU_PROJETO_ID",
+            storageBucket: "SEU_PROJETO.appspot.com",
+            messagingSenderId: "ID",
+            appId: "ID_DO_APP"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const tasksCol = collection(db, "tasks");
+
+        // FUNÇÕES DE UI
+        window.openModal = () => document.getElementById('taskModal').classList.remove('hidden');
+        window.closeModal = () => document.getElementById('taskModal').classList.add('hidden');
+
+        // SALVAR TAREFA
+        document.getElementById('taskForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('taskTitle').value;
+            const requester = document.getElementById('taskRequester').value;
+
+            try {
+                await addDoc(tasksCol, {
+                    title,
+                    requester,
+                    status: 'todo',
+                    createdAt: new Date()
+                });
+                closeModal();
+                document.getElementById('taskForm').reset();
+            } catch (error) {
+                console.error("Erro ao salvar:", error);
+            }
+        });
+
+        // ESCUTAR MUDANÇAS EM TEMPO REAL
+        onSnapshot(tasksCol, (snapshot) => {
+            renderTasks(snapshot.docs);
+        });
+
+        function renderTasks(docs) {
+            const lists = { todo: '', doing: '', done: '' };
+            let counts = { todo: 0, doing: 0, done: 0 };
+
+            docs.forEach(docSnap => {
+                const task = docSnap.data();
+                const id = docSnap.id;
+                counts[task.status]++;
+
+                const html = `
+                    <div class="task-card bg-white p-3 rounded shadow border-b-2 border-gray-300" draggable="true" ondragstart="event.dataTransfer.setData('text/plain', '${id}')">
+                        <div class="flex justify-between items-start">
+                            <h4 class="font-semibold text-gray-800">${task.title}</h4>
+                            <button onclick="deleteTask('${id}')" class="text-red-400 hover:text-red-600 text-xs"><i class="fas fa-trash"></i></button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2"><i class="fas fa-user mr-1"></i>${task.requester || 'N/A'}</p>
                     </div>
-                     <div class="mb-4">
-                        <label for="taskSolicitante" class="block text-gray-700 font-medium mb-1">Solicitante</label>
-                        <input type="text" id="taskSolicitante" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <div class="mb-4">
-                        <label for="taskDataSolicitacao" class="block text-gray-700 font-medium mb-1">Data da Solicitação</label>
-                        <input type="date" id="taskDataSolicitacao" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    <div class="mb-4">
-                        <label for="taskDataAgendamento" class="block text-gray-700 font-medium mb-1">Data de Agendamento</label>
-                        <input type="date" id="taskDataAgendamento" class="w-full px-3
+                `;
+                lists[task.status] += html;
+            });
+
+            // Atualizar Colunas
+            document.getElementById('todo-list').innerHTML = lists.todo;
+            document.getElementById('doing-list').innerHTML = lists.doing;
+            document.getElementById('done-list').innerHTML = lists.done;
+
+            // Atualizar Dashboard
+            document.getElementById('total-tasks').innerText = docs.length;
+            document.getElementById('todo-count').innerText = counts.todo;
+            document.getElementById('doing-count').innerText = counts.doing;
+            document.getElementById('done-count').innerText = counts.done;
+        }
+
+        // DELETAR TAREFA
+        window.deleteTask = async (id) => {
+            if(confirm('Deseja excluir esta tarefa?')) {
+                await deleteDoc(doc(db, "tasks", id));
+            }
+        }
+
+        // DRAG AND DROP LOGIC
+        const columns = document.querySelectorAll('.task-column');
+        columns.forEach(col => {
+            col.addEventListener('dragover', (e) => e.preventDefault());
+            col.addEventListener('drop', async (e) => {
+                const id = e.dataTransfer.getData('text/plain');
+                const newStatus = col.getAttribute('data-status');
+                await updateDoc(doc(db, "tasks", id), { status: newStatus });
+            });
+        });
+    </script>
+</body>
+</html>
