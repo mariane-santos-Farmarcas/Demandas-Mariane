@@ -94,7 +94,6 @@
             margin: 0.5rem auto;
             border-radius: 0.25rem;
         }
-        /* Custom Message Box replacement for Alert */
         #custom-message {
             position: fixed;
             top: 20px;
@@ -103,7 +102,7 @@
             border-radius: 8px;
             color: white;
             font-weight: bold;
-            z-index: 2000;
+            z-index: 3000;
             display: none;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
@@ -111,7 +110,6 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <!-- Toast de Notificação -->
     <div id="custom-message"></div>
 
     <div class="max-w-7xl mx-auto">
@@ -124,10 +122,9 @@
             <!-- Tabs preenchidas por JS -->
         </nav>
 
-        <!-- Produtividade -->
         <section id="productivity-dashboard" class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-500">
-                <h2 class="text-sm font-medium text-gray-500">Total de Tarefas</h2>
+                <h2 class="text-sm font-medium text-gray-500">Total</h2>
                 <p id="total-tasks" class="text-3xl font-bold text-gray-800">0</p>
             </div>
             <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-orange-500">
@@ -144,7 +141,6 @@
             </div>
         </section>
 
-        <!-- Ações -->
         <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
              <div class="flex flex-wrap gap-2">
                 <button id="addTaskBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors flex items-center gap-2">
@@ -181,7 +177,7 @@
             </div>
         </main>
         
-        <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md p-2"></div>
+        <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md p-2 min-h-[400px]"></div>
     </div>
 
     <!-- Modal Adicionar/Editar -->
@@ -258,11 +254,11 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-task-app';
-        const apiKey = "";
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-board-prod';
+        const apiKey = ""; // Chave fornecida pelo ambiente
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
-        // Estado
+        // Estado Global
         let allTasks = [];
         let currentBoardId = 'geral';
         const boards = [
@@ -273,36 +269,7 @@
             { id: 'entregas-internas', name: 'Entregas Internas' }
         ];
 
-        // Elementos DOM
-        const els = {
-            tabs: document.getElementById('tabs-container'),
-            title: document.getElementById('board-title'),
-            kanban: document.getElementById('kanban-board'),
-            consolidated: document.getElementById('consolidated-view'),
-            addTaskBtn: document.getElementById('addTaskBtn'),
-            taskModal: document.getElementById('taskModal'),
-            taskForm: document.getElementById('taskForm'),
-            cancelBtn: document.getElementById('cancelBtn'),
-            generateSummaryBtn: document.getElementById('generateSummaryBtn'),
-            summaryModal: document.getElementById('summaryModal'),
-            closeSummaryBtn: document.getElementById('closeSummaryBtn'),
-            summaryContent: document.getElementById('summaryContent'),
-            checklist: document.getElementById('checklist-container'),
-            addChecklistItemBtn: document.getElementById('addChecklistItemBtn'),
-            checklistItemInput: document.getElementById('checklistItemInput'),
-            importBtn: document.getElementById('importBtn'),
-            importFile: document.getElementById('importFile'),
-            exportBtn: document.getElementById('exportBtn'),
-            clearAllBtn: document.getElementById('clearAllBtn'),
-            observations: document.getElementById('taskObservacoes'),
-            columns: {
-                todo: document.getElementById('todo-list'),
-                doing: document.getElementById('doing-list'),
-                done: document.getElementById('done-list')
-            }
-        };
-
-        // --- Notificação ---
+        // --- Funções Auxiliares ---
         const showMsg = (txt, color='bg-blue-600') => {
             const m = document.getElementById('custom-message');
             m.textContent = txt;
@@ -311,28 +278,10 @@
             setTimeout(() => { m.style.display = 'none'; }, 3000);
         };
 
-        // --- Firebase Auth ---
-        const start = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-        };
+        const formatDate = (d) => d ? new Date(d + "T12:00:00").toLocaleDateString('pt-BR') : '';
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
-                onSnapshot(tasksRef, (snap) => {
-                    allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    renderBoard();
-                    renderDash();
-                }, (err) => console.error("Sync Error", err));
-            }
-        });
-
-        // --- Renderização ---
-        const renderDash = () => {
+        // --- Lógica de Renderização ---
+        const updateDash = () => {
             document.getElementById('total-tasks').textContent = allTasks.length;
             document.getElementById('todo-tasks').textContent = allTasks.filter(t => t.status === 'todo').length;
             document.getElementById('doing-tasks').textContent = allTasks.filter(t => t.status === 'doing').length;
@@ -340,34 +289,45 @@
         };
 
         const renderTabs = () => {
-            els.tabs.innerHTML = '';
+            const container = document.getElementById('tabs-container');
+            container.innerHTML = '';
             boards.forEach(b => {
                 const btn = document.createElement('button');
                 btn.className = `tab-btn flex-1 text-gray-600 py-3 px-4 border-b-2 border-transparent text-sm md:text-base whitespace-nowrap ${currentBoardId === b.id ? 'active' : ''}`;
                 btn.textContent = b.name;
-                btn.onclick = () => { currentBoardId = b.id; renderTabs(); renderBoard(); };
-                els.tabs.appendChild(btn);
+                btn.onclick = () => { 
+                    currentBoardId = b.id; 
+                    renderTabs(); 
+                    renderBoard(); 
+                };
+                container.appendChild(btn);
             });
         };
 
         const renderBoard = () => {
-            els.title.textContent = boards.find(b => b.id === currentBoardId).name;
+            document.getElementById('board-title').textContent = boards.find(b => b.id === currentBoardId).name;
             const isConsol = currentBoardId === 'consolidado';
             
-            els.kanban.style.display = isConsol ? 'none' : 'flex';
-            els.consolidated.style.display = isConsol ? 'block' : 'none';
-            els.addTaskBtn.style.display = isConsol ? 'none' : 'flex';
-            els.importBtn.style.display = isConsol ? 'none' : 'flex';
-            els.exportBtn.style.display = isConsol ? 'none' : 'flex';
-            els.clearAllBtn.style.display = isConsol ? 'none' : 'flex';
+            document.getElementById('kanban-board').style.display = isConsol ? 'none' : 'flex';
+            document.getElementById('consolidated-view').style.display = isConsol ? 'block' : 'none';
+            
+            // Mostrar/Ocultar botões baseado na aba
+            document.getElementById('addTaskBtn').style.display = isConsol ? 'none' : 'flex';
+            document.getElementById('importBtn').style.display = isConsol ? 'none' : 'flex';
+            document.getElementById('exportBtn').style.display = isConsol ? 'none' : 'flex';
+            document.getElementById('clearAllBtn').style.display = isConsol ? 'none' : 'flex';
 
             if (isConsol) {
                 renderTable();
             } else {
-                Object.values(els.columns).forEach(c => c.innerHTML = '');
+                const cols = {
+                    todo: document.getElementById('todo-list'),
+                    doing: document.getElementById('doing-list'),
+                    done: document.getElementById('done-list')
+                };
+                Object.values(cols).forEach(c => c.innerHTML = '');
                 allTasks.filter(t => t.boardId === currentBoardId).forEach(t => {
-                    const card = createCard(t);
-                    if (els.columns[t.status]) els.columns[t.status].appendChild(card);
+                    cols[t.status]?.appendChild(createCard(t));
                 });
             }
         };
@@ -378,52 +338,69 @@
             div.id = task.id;
             div.draggable = true;
 
-            const fmtDate = (d) => d ? new Date(d + "T12:00:00").toLocaleDateString('pt-BR') : '';
-
             div.innerHTML = `
                 <div class="card-controls absolute top-2 right-2 flex gap-2">
-                    <button class="dup-btn text-gray-300 hover:text-green-500"><i class="fas fa-clone fa-xs"></i></button>
-                    <button class="edit-btn text-gray-300 hover:text-blue-500"><i class="fas fa-pencil fa-xs"></i></button>
-                    <button class="del-btn text-gray-300 hover:text-red-500"><i class="fas fa-trash fa-xs"></i></button>
+                    <button class="dup-btn text-gray-300 hover:text-green-500" title="Duplicar"><i class="fas fa-clone fa-xs"></i></button>
+                    <button class="edit-btn text-gray-300 hover:text-blue-500" title="Editar"><i class="fas fa-pencil fa-xs"></i></button>
+                    <button class="del-btn text-gray-300 hover:text-red-500" title="Excluir"><i class="fas fa-trash fa-xs"></i></button>
                 </div>
                 <h4 class="font-bold text-gray-800 text-sm pr-12 text-left">${task.tarefa}</h4>
                 ${task.solicitante ? `<div class="task-detail mt-1 text-left"><i class="fas fa-user text-[10px]"></i><span class="text-xs">${task.solicitante}</span></div>` : ''}
                 <div class="mt-2 space-y-0.5 border-t pt-2 text-left">
-                    ${task.dataAgendamento ? `<div class="task-detail"><i class="fas fa-calendar-day text-[10px]"></i><span class="text-[10px]">Agendado: ${fmtDate(task.dataAgendamento)}</span></div>` : ''}
-                    ${task.dataEntrega ? `<div class="task-detail"><i class="fas fa-check-circle text-[10px] text-green-500"></i><span class="text-[10px] font-bold text-green-600">Entregue: ${fmtDate(task.dataEntrega)}</span></div>` : ''}
+                    ${task.dataAgendamento ? `<div class="task-detail"><i class="fas fa-calendar-day text-[10px]"></i><span class="text-[10px]">Agendado: ${formatDate(task.dataAgendamento)}</span></div>` : ''}
+                    ${task.dataEntrega ? `<div class="task-detail"><i class="fas fa-check-circle text-[10px] text-green-500"></i><span class="text-[10px] font-bold text-green-600">Entregue: ${formatDate(task.dataEntrega)}</span></div>` : ''}
                 </div>
                 ${task.observacoes ? `<div class="task-observations text-[10px] text-gray-500 mt-2 line-clamp-3 overflow-hidden text-left">${task.observacoes}</div>` : ''}
             `;
 
-            div.querySelector('.del-btn').onclick = () => { if(confirm("Excluir?")) deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id)); };
-            div.querySelector('.edit-btn').onclick = () => openModal(task);
-            div.querySelector('.dup-btn').onclick = () => openModal({...task, id: 'task-'+Date.now()}, true);
+            div.querySelector('.del-btn').onclick = (e) => { 
+                e.stopPropagation();
+                if(confirm("Deseja mesmo excluir esta tarefa?")) deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id)); 
+            };
+            div.querySelector('.edit-btn').onclick = (e) => { e.stopPropagation(); openModal(task); };
+            div.querySelector('.dup-btn').onclick = (e) => { 
+                e.stopPropagation();
+                openModal({...task, id: 'task-'+Date.now()}, true); 
+            };
             div.ondragstart = (e) => e.dataTransfer.setData('text', task.id);
 
             return div;
         };
 
         const renderTable = () => {
-            els.consolidated.innerHTML = `
+            const container = document.getElementById('consolidated-view');
+            container.innerHTML = `
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm border-collapse min-w-[600px]">
-                        <thead class="bg-gray-100">
-                            <tr><th class="p-3 border">Solicitante</th><th class="p-3 border">Tarefa</th><th class="p-3 border">Prazo</th><th class="p-3 border">Status</th></tr>
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="p-3 border">Solicitante</th>
+                                <th class="p-3 border">Tarefa</th>
+                                <th class="p-3 border">Prazo</th>
+                                <th class="p-3 border">Status</th>
+                            </tr>
                         </thead>
                         <tbody>${allTasks.map(t => {
                             const stMap = {todo:'A Fazer', doing:'Em Andamento', done:'Concluído'};
                             const stCol = {todo:'bg-orange-100 text-orange-700', doing:'bg-blue-100 text-blue-700', done:'bg-green-100 text-green-700'};
-                            return `<tr><td class="p-3 border">${t.solicitante || '-'}</td><td class="p-3 border font-medium">${t.tarefa}</td><td class="p-3 border">${t.dataAgendamento || '-'}</td><td class="p-3 border"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${stCol[t.status]}">${stMap[t.status]}</span></td></tr>`;
+                            return `<tr>
+                                <td class="p-3 border">${t.solicitante || '-'}</td>
+                                <td class="p-3 border font-medium">${t.tarefa}</td>
+                                <td class="p-3 border">${t.dataAgendamento || '-'}</td>
+                                <td class="p-3 border"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${stCol[t.status]}">${stMap[t.status]}</span></td>
+                            </tr>`;
                         }).join('')}</tbody>
                     </table>
                 </div>`;
         };
 
-        // --- Modais e Forms ---
+        // --- Modais ---
         const openModal = (t = null, isDup = false) => {
-            els.taskForm.reset();
-            els.observations.innerHTML = '';
-            els.checklist.innerHTML = '';
+            const form = document.getElementById('taskForm');
+            form.reset();
+            document.getElementById('taskObservacoes').innerHTML = '';
+            document.getElementById('checklist-container').innerHTML = '';
+            
             if (t) {
                 document.getElementById('taskId').value = isDup ? 'task-'+Date.now() : t.id;
                 document.getElementById('taskTarefa').value = t.tarefa;
@@ -431,158 +408,209 @@
                 document.getElementById('taskDataSolicitacao').value = t.dataSolicitacao || '';
                 document.getElementById('taskDataAgendamento').value = t.dataAgendamento || '';
                 document.getElementById('taskDataEntrega').value = t.dataEntrega || '';
-                els.observations.innerHTML = t.observacoes || '';
-                if(t.checklist) JSON.parse(t.checklist).forEach(i => addItem(i.text, i.checked));
+                document.getElementById('taskObservacoes').innerHTML = t.observacoes || '';
+                if(t.checklist) {
+                    try {
+                        JSON.parse(t.checklist).forEach(i => addItem(i.text, i.checked));
+                    } catch(e) {}
+                }
+                document.getElementById('modalTitle').textContent = isDup ? 'Duplicar Tarefa' : 'Editar Tarefa';
             } else {
                 document.getElementById('taskId').value = 'task-'+Date.now();
+                document.getElementById('modalTitle').textContent = 'Nova Tarefa';
             }
-            els.taskModal.classList.remove('hidden');
-            els.taskModal.classList.add('flex');
+            
+            document.getElementById('taskModal').classList.remove('hidden');
+            document.getElementById('taskModal').classList.add('flex');
         };
 
         const addItem = (txt, chk = false) => {
+            const container = document.getElementById('checklist-container');
             const d = document.createElement('div');
             d.className = 'flex items-center gap-2 bg-gray-50 p-2 mb-2 rounded';
-            d.innerHTML = `<input type="checkbox" ${chk?'checked':''} class="h-4 w-4"><input type="text" value="${txt}" class="flex-grow bg-transparent text-sm focus:outline-none"><button type="button" class="text-red-400"><i class="fas fa-times"></i></button>`;
+            d.innerHTML = `
+                <input type="checkbox" ${chk?'checked':''} class="h-4 w-4">
+                <input type="text" value="${txt}" class="flex-grow bg-transparent text-sm focus:outline-none">
+                <button type="button" class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>
+            `;
             d.querySelector('button').onclick = () => d.remove();
-            els.checklist.appendChild(d);
+            container.appendChild(d);
         };
 
-        // Eventos
-        els.addTaskBtn.onclick = () => openModal();
-        els.cancelBtn.onclick = () => els.taskModal.classList.add('hidden');
-        els.addChecklistItemBtn.onclick = () => { if(els.checklistItemInput.value) { addItem(els.checklistItemInput.value); els.checklistItemInput.value=''; } };
-
-        els.taskForm.onsubmit = async (e) => {
-            e.preventDefault();
-            const id = document.getElementById('taskId').value;
-            const entrega = document.getElementById('taskDataEntrega').value;
-            const checklist = [];
-            els.checklist.querySelectorAll('div.flex').forEach(item => {
-                const text = item.querySelector('input[type="text"]').value;
-                if(text) checklist.push({ text, checked: item.querySelector('input[type="checkbox"]').checked });
+        // --- Atribuição de Eventos ---
+        const setupEvents = () => {
+            document.getElementById('addTaskBtn').addEventListener('click', () => openModal());
+            document.getElementById('cancelBtn').addEventListener('click', () => document.getElementById('taskModal').classList.add('hidden'));
+            
+            document.getElementById('addChecklistItemBtn').addEventListener('click', () => {
+                const input = document.getElementById('checklistItemInput');
+                if(input.value.trim()) { addItem(input.value.trim()); input.value=''; }
             });
-            const old = allTasks.find(x => x.id === id);
-            let st = old ? old.status : 'todo';
-            if (entrega) st = 'done';
 
-            const data = {
-                id, boardId: currentBoardId, status: st,
-                tarefa: document.getElementById('taskTarefa').value,
-                solicitante: document.getElementById('taskSolicitante').value,
-                dataSolicitacao: document.getElementById('taskDataSolicitacao').value,
-                dataAgendamento: document.getElementById('taskDataAgendamento').value,
-                dataEntrega: entrega,
-                observacoes: els.observations.innerHTML,
-                checklist: JSON.stringify(checklist)
-            };
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', id), data);
-            els.taskModal.classList.add('hidden');
-            showMsg("Tarefa Salva!");
-        };
-
-        // --- Drag and Drop Logic ---
-        document.querySelectorAll('.task-column').forEach(col => {
-            col.ondragover = (e) => { e.preventDefault(); col.classList.add('drag-over'); };
-            col.ondragleave = () => col.classList.remove('drag-over');
-            col.ondrop = async (e) => {
+            document.getElementById('taskForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                col.classList.remove('drag-over');
-                const tid = e.dataTransfer.getData('text');
-                const task = allTasks.find(t => t.id === tid);
-                if (task && task.status !== col.dataset.columnId) {
-                    const up = { ...task, status: col.dataset.columnId };
-                    if (up.status === 'done' && !up.dataEntrega) up.dataEntrega = new Date().toISOString().split('T')[0];
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', tid), up);
+                const id = document.getElementById('taskId').value;
+                const entrega = document.getElementById('taskDataEntrega').value;
+                const checklist = [];
+                document.getElementById('checklist-container').querySelectorAll('div.flex').forEach(item => {
+                    const text = item.querySelector('input[type="text"]').value;
+                    if(text) checklist.push({ text, checked: item.querySelector('input[type="checkbox"]').checked });
+                });
+
+                const existing = allTasks.find(x => x.id === id);
+                let st = existing ? existing.status : 'todo';
+                if (entrega) st = 'done';
+
+                const data = {
+                    id, 
+                    boardId: currentBoardId, 
+                    status: st,
+                    tarefa: document.getElementById('taskTarefa').value,
+                    solicitante: document.getElementById('taskSolicitante').value,
+                    dataSolicitacao: document.getElementById('taskDataSolicitacao').value,
+                    dataAgendamento: document.getElementById('taskDataAgendamento').value,
+                    dataEntrega: entrega,
+                    observacoes: document.getElementById('taskObservacoes').innerHTML,
+                    checklist: JSON.stringify(checklist)
+                };
+                
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', id), data);
+                document.getElementById('taskModal').classList.add('hidden');
+                showMsg("Sucesso: Tarefa salva!");
+            });
+
+            // IA
+            document.getElementById('generateAIBtn').addEventListener('click', async () => {
+                const title = document.getElementById('taskTarefa').value;
+                if(!title) return alert("Dê um título à tarefa primeiro.");
+                const btn = document.getElementById('generateAIBtn');
+                const original = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                try {
+                    const resp = await fetch(geminiUrl, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: `Gere 5 subtarefas para: "${title}"` }] }], systemInstruction: { parts: [{ text: "Retorne apenas lista simples, sem números." }] } }) });
+                    const res = await resp.json();
+                    res.candidates[0].content.parts[0].text.split('\n').forEach(l => { if(l.trim()) addItem(l.trim().replace(/^[\d.-]\s*/, '')); });
+                } catch(e) { showMsg("IA falhou", "bg-red-500"); }
+                btn.innerHTML = original;
+            });
+
+            document.getElementById('generateSummaryBtn').addEventListener('click', async () => {
+                const modal = document.getElementById('summaryModal');
+                const content = document.getElementById('summaryContent');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                content.innerHTML = '<p class="text-center p-8">IA analisando dados...</p>';
+                try {
+                    const resp = await fetch(geminiUrl, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: `Analise motivacionalmente: ${allTasks.map(t=>t.tarefa).join(', ')}` }] }], systemInstruction: { parts: [{ text: "Responda em Português HTML simples." }] } }) });
+                    const res = await resp.json();
+                    content.innerHTML = res.candidates[0].content.parts[0].text;
+                } catch(e) { content.innerHTML = "Erro ao conectar com IA."; }
+            });
+
+            document.getElementById('closeSummaryBtn').addEventListener('click', () => document.getElementById('summaryModal').classList.add('hidden'));
+
+            // CSV
+            document.getElementById('exportBtn').addEventListener('click', () => {
+                const h = "boardId;status;id;tarefa;solicitante;dataSolicitacao;dataAgendamento;dataEntrega;observacoes_b64;checklist_b64";
+                const rows = allTasks.map(t => [t.boardId, t.status, t.id, `"${t.tarefa}"`, `"${t.solicitante||''}"`, t.dataSolicitacao||'', t.dataAgendamento||'', t.dataEntrega||'', btoa(unescape(encodeURIComponent(t.observacoes||''))), btoa(unescape(encodeURIComponent(t.checklist||'')))].join(';'));
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob(["\uFEFFsep=;\n" + h + "\n" + rows.join("\n")], { type: 'text/csv;charset=utf-8;' }));
+                a.download = "backup_tarefas.csv"; a.click();
+            });
+
+            document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+            document.getElementById('importFile').addEventListener('change', async (e) => {
+                const f = e.target.files[0]; if(!f) return;
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
+                    const lines = ev.target.result.split('\n').filter(l => l.trim() && !l.startsWith('sep='));
+                    const headers = lines[0].split(';');
+                    for (let i = 1; i < lines.length; i++) {
+                        const vals = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                        const data = {};
+                        headers.forEach((h, idx) => {
+                            let v = (vals[idx] || '').trim();
+                            if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1).replace(/""/g, '"');
+                            data[h.trim()] = v;
+                        });
+                        try {
+                            if(data.observacoes_b64) data.observacoes = decodeURIComponent(escape(atob(data.observacoes_b64)));
+                            if(data.checklist_b64) data.checklist = decodeURIComponent(escape(atob(data.checklist_b64)));
+                            delete data.observacoes_b64; delete data.checklist_b64;
+                        } catch(ex) {}
+                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', data.id), data);
+                    }
+                    showMsg("Importação concluída!", "bg-teal-600");
+                };
+                reader.readAsText(f);
+            });
+
+            document.getElementById('clearAllBtn').addEventListener('click', () => {
+                if (confirm("Apagar todas as tarefas deste painel?")) {
+                    allTasks.filter(t => t.boardId === currentBoardId).forEach(t => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id)));
+                }
+            });
+
+            // Drag and Drop
+            document.querySelectorAll('.task-column').forEach(col => {
+                col.ondragover = (e) => { e.preventDefault(); col.classList.add('drag-over'); };
+                col.ondragleave = () => col.classList.remove('drag-over');
+                col.ondrop = async (e) => {
+                    e.preventDefault();
+                    col.classList.remove('drag-over');
+                    const id = e.dataTransfer.getData('text');
+                    const task = allTasks.find(t => t.id === id);
+                    if (task && task.status !== col.dataset.columnId) {
+                        const up = { ...task, status: col.dataset.columnId };
+                        if (up.status === 'done' && !up.dataEntrega) up.dataEntrega = new Date().toISOString().split('T')[0];
+                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', id), up);
+                    }
+                };
+            });
+
+            // Paste Image
+            document.getElementById('taskObservacoes').onpaste = (e) => {
+                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (const item of items) {
+                    if (item.type.indexOf('image') === 0) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => { 
+                            const img = document.createElement('img'); 
+                            img.src = ev.target.result; 
+                            document.getElementById('taskObservacoes').appendChild(img); 
+                        };
+                        reader.readAsDataURL(item.getAsFile());
+                    }
                 }
             };
+        };
+
+        // --- Inicialização ---
+        const start = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) { console.error("Auth Erro", e); }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                const ref = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
+                onSnapshot(ref, (snap) => {
+                    allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    renderBoard();
+                    updateDash();
+                });
+            }
         });
 
-        // IA
-        const callAI = async (prompt, system) => {
-            const resp = await fetch(geminiUrl, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: system }] } }) });
-            return await resp.json();
-        };
-
-        document.getElementById('generateAIBtn').onclick = async () => {
-            const t = document.getElementById('taskTarefa').value;
-            if(!t) return;
-            const btn = document.getElementById('generateAIBtn');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            try {
-                const res = await callAI(`Subtarefas para: "${t}"`, "Retorne apenas uma lista simples de 5 ações curtas separadas por quebra de linha.");
-                res.candidates[0].content.parts[0].text.split('\n').forEach(l => { if(l.trim()) addItem(l.trim().replace(/^[\d.-]\s*/, '')); });
-            } catch(e) { showMsg("IA falhou", "bg-red-500"); }
-            btn.innerHTML = '✨ Gerar com IA';
-        };
-
-        els.generateSummaryBtn.onclick = async () => {
-            els.summaryModal.classList.remove('hidden');
-            els.summaryModal.classList.add('flex');
-            els.summaryContent.innerHTML = '<p class="text-center p-8">Analisando...</p>';
-            try {
-                const res = await callAI(`Resuma motivacionalmente:\n${allTasks.map(t=>t.tarefa).join(', ')}`, "Aja como coach sênior. Responda em Português HTML simples.");
-                els.summaryContent.innerHTML = res.candidates[0].content.parts[0].text;
-            } catch(e) { els.summaryContent.innerHTML = "Erro IA."; }
-        };
-        els.closeSummaryBtn.onclick = () => els.summaryModal.classList.add('hidden');
-
-        // CSV
-        els.exportBtn.onclick = () => {
-            const h = "boardId;status;id;tarefa;solicitante;dataSolicitacao;dataAgendamento;dataEntrega;observacoes_b64;checklist_b64";
-            const r = allTasks.map(t => [t.boardId, t.status, t.id, `"${t.tarefa}"`, `"${t.solicitante||''}"`, t.dataSolicitacao||'', t.dataAgendamento||'', t.dataEntrega||'', btoa(unescape(encodeURIComponent(t.observacoes||''))), btoa(unescape(encodeURIComponent(t.checklist||'')))].join(';'));
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob(["\uFEFFsep=;\n" + h + "\n" + r.join("\n")], { type: 'text/csv;charset=utf-8;' }));
-            a.download = "backup.csv"; a.click();
-        };
-
-        els.importBtn.onclick = () => els.importFile.click();
-        els.importFile.onchange = async (e) => {
-            const f = e.target.files[0]; if(!f) return;
-            const r = new FileReader();
-            r.onload = async (ev) => {
-                const lines = ev.target.result.split('\n').filter(l => l.trim() && !l.startsWith('sep='));
-                const headers = lines[0].split(';');
-                for (let i = 1; i < lines.length; i++) {
-                    const vals = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                    const data = {};
-                    headers.forEach((h, idx) => {
-                        let v = (vals[idx] || '').trim();
-                        if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1).replace(/""/g, '"');
-                        data[h.trim()] = v;
-                    });
-                    try {
-                        if(data.observacoes_b64) data.observacoes = decodeURIComponent(escape(atob(data.observacoes_b64)));
-                        if(data.checklist_b64) data.checklist = decodeURIComponent(escape(atob(data.checklist_b64)));
-                        delete data.observacoes_b64; delete data.checklist_b64;
-                    } catch(ex) {}
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', data.id), data);
-                }
-                showMsg("Importação concluída!", "bg-teal-600");
-            };
-            r.readAsText(f);
-        };
-
-        els.clearAllBtn.onclick = () => {
-            if (confirm("Apagar painel atual?")) {
-                allTasks.filter(t => t.boardId === currentBoardId).forEach(t => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id)));
-            }
-        };
-
-        // Colar imagem
-        els.observations.onpaste = (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (const item of items) {
-                if (item.type.indexOf('image') === 0) {
-                    const reader = new FileReader();
-                    reader.onload = (ev) => { const img = document.createElement('img'); img.src = ev.target.result; els.observations.appendChild(img); };
-                    reader.readAsDataURL(item.getAsFile());
-                }
-            }
-        };
-
-        await start();
+        // Configurar botões imediatamente
+        setupEvents();
         renderTabs();
+        await start();
     </script>
 </body>
 </html>
