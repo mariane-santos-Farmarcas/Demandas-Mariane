@@ -94,7 +94,6 @@
             margin: 0.5rem auto;
             border-radius: 0.25rem;
         }
-        /* Loading Overlay */
         #loading-overlay {
             position: fixed;
             inset: 0;
@@ -180,7 +179,7 @@
         </main>
         
         <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md p-2">
-            <!-- Table will be injected here by JS -->
+            <!-- Tabela será injetada aqui via JS -->
         </div>
     </div>
 
@@ -252,21 +251,21 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, signInAnonymously, query, getAuth } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Firebase Configuration (Global variables provided by environment)
+        // Configuração Firebase
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-board-app';
 
-        // Gemini API Configuration
-        const GEMINI_API_KEY = "";
-        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
+        // Configuração API Gemini
+        const apiKey = "";
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
-        // App State
+        // Estado da aplicação
         let allTasksFromDB = [];
         let currentBoardId = 'geral';
         const boards = [
@@ -277,7 +276,7 @@
             { id: 'entregas-internas', name: 'Entregas Internas' }
         ];
 
-        // DOM Elements
+        // Elementos DOM
         const loadingOverlay = document.getElementById('loading-overlay');
         const tabsContainer = document.getElementById('tabs-container');
         const boardTitleEl = document.getElementById('board-title');
@@ -305,7 +304,7 @@
             done: document.getElementById('done-list')
         };
 
-        // --- Firebase Core Logic ---
+        // --- Core Lógica Firebase ---
 
         const initApp = async () => {
             try {
@@ -315,8 +314,7 @@
                     await signInAnonymously(auth);
                 }
             } catch (error) {
-                console.error("Auth failed:", error);
-                alert("Erro ao conectar com o servidor de dados.");
+                console.error("Auth falhou:", error);
             }
         };
 
@@ -334,11 +332,11 @@
                 renderCurrentBoard();
                 updateDashboard();
             }, (error) => {
-                console.error("Firestore sync error:", error);
+                console.error("Erro Firestore sync:", error);
             });
         };
 
-        // --- Data Actions ---
+        // --- Ações de Dados ---
 
         const saveTaskToFirebase = async (taskData) => {
             const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskData.id);
@@ -350,7 +348,7 @@
             await deleteDoc(taskRef);
         };
 
-        // --- Rendering ---
+        // --- Renderização ---
 
         const renderTabs = () => {
             tabsContainer.innerHTML = '';
@@ -401,7 +399,7 @@
             card.draggable = true;
             card.className = 'task-card bg-white p-3 rounded-md shadow-sm border border-gray-200 relative mb-4';
             
-            const formatDate = (ds) => ds ? new Date(ds + "T12:00:00").toLocaleDateString('pt-BR') : '';
+            const formatDateStr = (ds) => ds ? new Date(ds + "T12:00:00").toLocaleDateString('pt-BR') : '';
             
             let checklistSummary = '';
             if (task.checklist) {
@@ -429,8 +427,8 @@
                 <h4 class="font-bold text-gray-800 text-sm pr-12">${task.tarefa}</h4>
                 ${task.solicitante ? `<div class="task-detail mt-1"><i class="fas fa-user text-[10px]"></i><span class="text-xs">${task.solicitante}</span></div>` : ''}
                 <div class="mt-2 space-y-0.5 border-t pt-2">
-                    ${task.dataAgendamento ? `<div class="task-detail"><i class="fas fa-calendar-day text-[10px]"></i><span class="text-[10px]">Agendado: ${formatDate(task.dataAgendamento)}</span></div>` : ''}
-                    ${task.dataEntrega ? `<div class="task-detail"><i class="fas fa-check-circle text-[10px] text-green-500"></i><span class="text-[10px] font-bold text-green-600">Entregue: ${formatDate(task.dataEntrega)}</span></div>` : ''}
+                    ${task.dataAgendamento ? `<div class="task-detail"><i class="fas fa-calendar-day text-[10px]"></i><span class="text-[10px]">Agendado: ${formatDateStr(task.dataAgendamento)}</span></div>` : ''}
+                    ${task.dataEntrega ? `<div class="task-detail"><i class="fas fa-check-circle text-[10px] text-green-500"></i><span class="text-[10px] font-bold text-green-600">Entregue: ${formatDateStr(task.dataEntrega)}</span></div>` : ''}
                 </div>
                 ${task.observacoes ? `<div class="task-observations text-[10px] text-gray-500 mt-2 line-clamp-2 overflow-hidden">${task.observacoes}</div>` : ''}
                 ${checklistSummary}
@@ -522,13 +520,13 @@
             col.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 col.classList.remove('drag-over');
-                const taskId = e.dataTransfer.getData('text/plain');
+                const taskId = e.dataTransfer.setData('text/plain', e.dataTransfer.getData('text/plain')); // No-op to trigger browser behavior
+                const draggedId = e.dataTransfer.getData('text/plain');
                 const newStatus = col.dataset.columnId;
                 
-                const task = allTasksFromDB.find(t => t.id === taskId);
+                const task = allTasksFromDB.find(t => t.id === draggedId);
                 if (task && task.status !== newStatus) {
                     const updatedTask = { ...task, status: newStatus };
-                    // Autocomplete data entrega se mover para done
                     if (newStatus === 'done' && !updatedTask.dataEntrega) {
                         updatedTask.dataEntrega = new Date().toISOString().split('T')[0];
                     }
@@ -537,7 +535,7 @@
             });
         });
 
-        // --- Modal Logic ---
+        // --- Lógica Modal ---
 
         const openModal = (task = null, isDup = false) => {
             taskForm.reset();
@@ -555,8 +553,10 @@
                 document.getElementById('taskObservacoes').innerHTML = task.observacoes || '';
                 
                 if (task.checklist) {
-                    const items = JSON.parse(task.checklist);
-                    items.forEach(i => addChecklistItem(i.text, i.checked));
+                    try {
+                        const items = JSON.parse(task.checklist);
+                        items.forEach(i => addChecklistItem(i.text, i.checked));
+                    } catch(e) {}
                 }
             } else {
                 modalTitle.textContent = 'Nova Tarefa';
@@ -569,7 +569,7 @@
 
         const addChecklistItem = (text, checked = false) => {
             const div = document.createElement('div');
-            div.className = 'flex items-center gap-2 bg-gray-50 p-2 rounded';
+            div.className = 'flex items-center gap-2 bg-gray-50 p-2 rounded mb-2';
             div.innerHTML = `
                 <input type="checkbox" ${checked ? 'checked' : ''} class="h-4 w-4">
                 <input type="text" value="${text}" class="flex-grow bg-transparent text-sm focus:outline-none">
@@ -584,7 +584,6 @@
             if (val) { addChecklistItem(val); checklistItemInput.value = ''; }
         };
 
-        // Suporte para colar imagens nas observações
         document.getElementById('taskObservacoes').addEventListener('paste', (e) => {
             const items = (e.clipboardData || e.originalEvent.clipboardData).items;
             for (const item of items) {
@@ -608,10 +607,12 @@
             const dataEntrega = document.getElementById('taskDataEntrega').value;
             
             const checklist = [];
-            checklistContainer.querySelectorAll('.flex').forEach(item => {
-                const text = item.querySelector('input[type="text"]').value.trim();
-                const checked = item.querySelector('input[type="checkbox"]').checked;
-                if (text) checklist.push({ text, checked });
+            checklistContainer.querySelectorAll('div.flex').forEach(item => {
+                const textInput = item.querySelector('input[type="text"]');
+                const checkInput = item.querySelector('input[type="checkbox"]');
+                if (textInput && textInput.value.trim()) {
+                    checklist.push({ text: textInput.value.trim(), checked: checkInput.checked });
+                }
             });
 
             const originalTask = allTasksFromDB.find(t => t.id === id);
@@ -638,7 +639,17 @@
         cancelBtn.onclick = () => taskModal.classList.add('hidden');
         addTaskBtn.onclick = () => openModal();
 
-        // --- AI Features ---
+        // --- Funcionalidades IA ---
+
+        const callGemini = async (prompt, system) => {
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: system }] }
+            };
+            const response = await fetch(geminiUrl, { method: 'POST', body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error("Falha na API");
+            return await response.json();
+        };
 
         generateAIBtn.onclick = async () => {
             const title = document.getElementById('taskTarefa').value;
@@ -647,16 +658,12 @@
             generateAIBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             generateAIBtn.disabled = true;
 
-            const payload = {
-                contents: [{ parts: [{ text: `Gere uma lista de 5 subtarefas para: "${title}"` }] }],
-                systemInstruction: { parts: [{ text: "Aja como um analista de processos. Retorne apenas uma lista simples de ações curtas separadas por quebra de linha." }] }
-            };
-
             try {
-                const resp = await fetch(GEMINI_API_URL, { method: 'POST', body: JSON.stringify(payload) });
-                const data = await resp.json();
-                const text = data.candidates[0].content.parts[0].text;
-                text.split('\n').filter(l => l.trim()).forEach(l => addChecklistItem(l.trim().replace(/^[\d.-]\s*/, '')));
+                const data = await callGemini(`Gere uma lista de 5 subtarefas para: "${title}"`, "Aja como um analista de processos. Retorne apenas uma lista simples de ações curtas separadas por quebra de linha.");
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    text.split('\n').filter(l => l.trim()).forEach(l => addChecklistItem(l.trim().replace(/^[\d.-]\s*/, '')));
+                }
             } catch (err) { alert("Erro ao conectar com a IA."); }
             
             generateAIBtn.innerHTML = '✨ Gerar com IA';
@@ -669,28 +676,22 @@
             summaryContent.innerHTML = '<div class="text-center p-8"><i class="fas fa-spinner fa-spin text-3xl text-purple-500"></i><p class="mt-4">Analisando dados...</p></div>';
 
             const tasksStr = allTasksFromDB.map(t => `- ${t.tarefa} (${t.status})`).join('\n');
-            const payload = {
-                contents: [{ parts: [{ text: `Analise estas tarefas e dê um resumo motivacional:\n${tasksStr}` }] }],
-                systemInstruction: { parts: [{ text: "Aja como um coach de produtividade sênior. Responda em Português Brasileiro, formate com HTML simples (tags p, b, br, ul, li)." }] }
-            };
-
             try {
-                const resp = await fetch(GEMINI_API_URL, { method: 'POST', body: JSON.stringify(payload) });
-                const data = await resp.json();
-                summaryContent.innerHTML = data.candidates[0].content.parts[0].text;
+                const data = await callGemini(`Analise estas tarefas e dê um resumo motivacional:\n${tasksStr}`, "Aja como um coach de produtividade sênior. Responda em Português Brasileiro, formate com HTML simples (tags p, b, br, ul, li).");
+                summaryContent.innerHTML = data.candidates?.[0]?.content?.parts?.[0]?.text || "Não foi possível gerar o resumo.";
             } catch (err) { summaryContent.innerHTML = "Erro ao gerar resumo."; }
         };
 
         closeSummaryBtn.onclick = () => summaryModal.classList.add('hidden');
 
-        // --- Import / Export ---
+        // --- Importação / Exportação ---
 
         exportBtn.onclick = () => {
             const headers = "boardId;status;id;tarefa;solicitante;dataSolicitacao;dataAgendamento;dataEntrega;observacoes_b64;checklist_b64";
             const rows = allTasksFromDB.map(t => {
                 return [
                     t.boardId, t.status, t.id, 
-                    `"${t.tarefa}"`, `"${t.solicitante || ''}"`,
+                    `"${t.tarefa.replace(/"/g, '""')}"`, `"${(t.solicitante || '').replace(/"/g, '""')}"`,
                     t.dataSolicitacao || '', t.dataAgendamento || '', t.dataEntrega || '',
                     btoa(unescape(encodeURIComponent(t.observacoes || ''))),
                     btoa(unescape(encodeURIComponent(t.checklist || '')))
@@ -701,7 +702,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = "backup_painel_firebase.csv";
+            a.download = "backup_tarefas_nuvem.csv";
             a.click();
         };
 
@@ -712,6 +713,7 @@
             const reader = new FileReader();
             reader.onload = async (event) => {
                 const lines = event.target.result.split('\n').filter(l => l.trim() && !l.startsWith('sep='));
+                if(lines.length < 2) return;
                 const headers = lines[0].split(';');
                 
                 loadingOverlay.classList.remove('hidden');
@@ -727,13 +729,11 @@
                     });
 
                     try {
-                        data.observacoes = decodeURIComponent(escape(atob(data.observacoes_b64 || '')));
-                        data.checklist = decodeURIComponent(escape(atob(data.checklist_b64 || '')));
-                    } catch(ex) { console.warn("B64 fail", ex); }
-
-                    // Limpa campos temporários do CSV
-                    delete data.observacoes_b64;
-                    delete data.checklist_b64;
+                        if(data.observacoes_b64) data.observacoes = decodeURIComponent(escape(atob(data.observacoes_b64)));
+                        if(data.checklist_b64) data.checklist = decodeURIComponent(escape(atob(data.checklist_b64)));
+                        delete data.observacoes_b64;
+                        delete data.checklist_b64;
+                    } catch(ex) { console.warn("B64 decode falhou", ex); }
 
                     await saveTaskToFirebase(data);
                 }
@@ -744,7 +744,7 @@
         };
 
         clearAllBtn.onclick = async () => {
-            if (confirm(`Tem certeza que deseja apagar TODAS as tarefas deste painel (${boards.find(b=>b.id===currentBoardId).name})?`)) {
+            if (confirm(`Tem certeza que deseja apagar TODAS as tarefas deste painel?`)) {
                 const toDelete = allTasksFromDB.filter(t => t.boardId === currentBoardId);
                 for (const t of toDelete) {
                     await deleteTaskFromFirebase(t.id);
@@ -752,7 +752,7 @@
             }
         };
 
-        // Initialize
+        // Inicializar
         initApp();
         renderTabs();
 
