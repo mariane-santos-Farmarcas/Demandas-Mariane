@@ -94,24 +94,9 @@
             margin: 0.5rem auto;
             border-radius: 0.25rem;
         }
-        #loading-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(255, 255, 255, 0.8);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
     </style>
 </head>
 <body class="p-4 md:p-8">
-
-    <div id="loading-overlay">
-        <i class="fas fa-spinner fa-spin text-4xl text-blue-600"></i>
-        <p class="mt-4 font-semibold text-gray-700">Conectando ao Firebase...</p>
-    </div>
 
     <div class="max-w-7xl mx-auto">
         <header class="mb-6">
@@ -120,7 +105,7 @@
         </header>
 
         <nav id="tabs-container" class="flex border-b border-gray-300 mb-6 bg-gray-200 rounded-t-lg p-1 overflow-x-auto">
-            <!-- Tabs will be dynamically inserted here -->
+            <!-- Tabs serão inseridas aqui -->
         </nav>
 
         <section id="productivity-dashboard" class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -179,7 +164,7 @@
         </main>
         
         <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md p-2">
-            <!-- Tabela será injetada aqui via JS -->
+            <!-- Tabela Consolidada -->
         </div>
     </div>
 
@@ -277,7 +262,6 @@
         ];
 
         // Elementos DOM
-        const loadingOverlay = document.getElementById('loading-overlay');
         const tabsContainer = document.getElementById('tabs-container');
         const boardTitleEl = document.getElementById('board-title');
         const addTaskBtn = document.getElementById('addTaskBtn');
@@ -304,7 +288,7 @@
             done: document.getElementById('done-list')
         };
 
-        // --- Core Lógica Firebase ---
+        // --- Firebase Core ---
 
         const initApp = async () => {
             try {
@@ -320,7 +304,6 @@
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                loadingOverlay.classList.add('hidden');
                 setupRealtimeSync();
             }
         });
@@ -336,7 +319,7 @@
             });
         };
 
-        // --- Ações de Dados ---
+        // --- Data Actions ---
 
         const saveTaskToFirebase = async (taskData) => {
             const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskData.id);
@@ -348,7 +331,7 @@
             await deleteDoc(taskRef);
         };
 
-        // --- Renderização ---
+        // --- Rendering ---
 
         const renderTabs = () => {
             tabsContainer.innerHTML = '';
@@ -403,19 +386,21 @@
             
             let checklistSummary = '';
             if (task.checklist) {
-                const items = JSON.parse(task.checklist);
-                if (items.length > 0) {
-                    const done = items.filter(i => i.checked).length;
-                    const progress = Math.round((done / items.length) * 100);
-                    checklistSummary = `
-                        <div class="mt-3 pt-2 border-t border-dashed">
-                            <div class="flex justify-between text-[10px] text-gray-500 mb-1"><span>Ações</span><span>${done}/${items.length}</span></div>
-                            <div class="w-full bg-gray-100 rounded-full h-1"><div class="bg-green-500 h-1 rounded-full" style="width:${progress}%"></div></div>
-                            <div class="checklist-details mt-2 space-y-1">
-                                ${items.map(i => `<div class="text-[10px] flex items-center gap-1 ${i.checked ? 'line-through text-gray-400' : 'text-gray-600'}"><i class="far ${i.checked ? 'fa-check-square' : 'fa-square'}"></i>${i.text}</div>`).join('')}
-                            </div>
-                        </div>`;
-                }
+                try {
+                    const items = JSON.parse(task.checklist);
+                    if (items.length > 0) {
+                        const done = items.filter(i => i.checked).length;
+                        const progress = Math.round((done / items.length) * 100);
+                        checklistSummary = `
+                            <div class="mt-3 pt-2 border-t border-dashed text-left">
+                                <div class="flex justify-between text-[10px] text-gray-500 mb-1"><span>Ações</span><span>${done}/${items.length}</span></div>
+                                <div class="w-full bg-gray-100 rounded-full h-1"><div class="bg-green-500 h-1 rounded-full" style="width:${progress}%"></div></div>
+                                <div class="checklist-details mt-2 space-y-1">
+                                    ${items.map(i => `<div class="text-[10px] flex items-center gap-1 ${i.checked ? 'line-through text-gray-400' : 'text-gray-600'}"><i class="far ${i.checked ? 'fa-check-square' : 'fa-square'}"></i>${i.text}</div>`).join('')}
+                                </div>
+                            </div>`;
+                    }
+                } catch(e) {}
             }
 
             card.innerHTML = `
@@ -424,19 +409,17 @@
                     <button class="edit-btn text-gray-300 hover:text-blue-500"><i class="fas fa-pencil fa-xs"></i></button>
                     <button class="del-btn text-gray-300 hover:text-red-500"><i class="fas fa-trash fa-xs"></i></button>
                 </div>
-                <h4 class="font-bold text-gray-800 text-sm pr-12">${task.tarefa}</h4>
-                ${task.solicitante ? `<div class="task-detail mt-1"><i class="fas fa-user text-[10px]"></i><span class="text-xs">${task.solicitante}</span></div>` : ''}
-                <div class="mt-2 space-y-0.5 border-t pt-2">
+                <h4 class="font-bold text-gray-800 text-sm pr-12 text-left">${task.tarefa}</h4>
+                ${task.solicitante ? `<div class="task-detail mt-1 text-left"><i class="fas fa-user text-[10px]"></i><span class="text-xs">${task.solicitante}</span></div>` : ''}
+                <div class="mt-2 space-y-0.5 border-t pt-2 text-left">
                     ${task.dataAgendamento ? `<div class="task-detail"><i class="fas fa-calendar-day text-[10px]"></i><span class="text-[10px]">Agendado: ${formatDateStr(task.dataAgendamento)}</span></div>` : ''}
                     ${task.dataEntrega ? `<div class="task-detail"><i class="fas fa-check-circle text-[10px] text-green-500"></i><span class="text-[10px] font-bold text-green-600">Entregue: ${formatDateStr(task.dataEntrega)}</span></div>` : ''}
                 </div>
-                ${task.observacoes ? `<div class="task-observations text-[10px] text-gray-500 mt-2 line-clamp-2 overflow-hidden">${task.observacoes}</div>` : ''}
+                ${task.observacoes ? `<div class="task-observations text-[10px] text-gray-500 mt-2 line-clamp-2 overflow-hidden text-left">${task.observacoes}</div>` : ''}
                 ${checklistSummary}
             `;
 
-            card.querySelector('.del-btn').onclick = () => {
-                if(confirm("Excluir esta tarefa?")) deleteTaskFromFirebase(task.id);
-            };
+            card.querySelector('.del-btn').onclick = () => { if(confirm("Excluir esta tarefa?")) deleteTaskFromFirebase(task.id); };
             card.querySelector('.edit-btn').onclick = () => openModal(task);
             card.querySelector('.dup-btn').onclick = () => {
                 const newTask = {...task, id: 'task-' + Date.now()};
@@ -520,10 +503,8 @@
             col.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 col.classList.remove('drag-over');
-                const taskId = e.dataTransfer.setData('text/plain', e.dataTransfer.getData('text/plain')); // No-op to trigger browser behavior
                 const draggedId = e.dataTransfer.getData('text/plain');
                 const newStatus = col.dataset.columnId;
-                
                 const task = allTasksFromDB.find(t => t.id === draggedId);
                 if (task && task.status !== newStatus) {
                     const updatedTask = { ...task, status: newStatus };
@@ -535,7 +516,7 @@
             });
         });
 
-        // --- Lógica Modal ---
+        // --- Modal Logic ---
 
         const openModal = (task = null, isDup = false) => {
             taskForm.reset();
@@ -551,18 +532,15 @@
                 document.getElementById('taskDataAgendamento').value = task.dataAgendamento || '';
                 document.getElementById('taskDataEntrega').value = task.dataEntrega || '';
                 document.getElementById('taskObservacoes').innerHTML = task.observacoes || '';
-                
                 if (task.checklist) {
                     try {
-                        const items = JSON.parse(task.checklist);
-                        items.forEach(i => addChecklistItem(i.text, i.checked));
+                        JSON.parse(task.checklist).forEach(i => addChecklistItem(i.text, i.checked));
                     } catch(e) {}
                 }
             } else {
                 modalTitle.textContent = 'Nova Tarefa';
                 document.getElementById('taskId').value = 'task-' + Date.now();
             }
-            
             taskModal.classList.remove('hidden');
             taskModal.classList.add('flex');
         };
@@ -570,11 +548,7 @@
         const addChecklistItem = (text, checked = false) => {
             const div = document.createElement('div');
             div.className = 'flex items-center gap-2 bg-gray-50 p-2 rounded mb-2';
-            div.innerHTML = `
-                <input type="checkbox" ${checked ? 'checked' : ''} class="h-4 w-4">
-                <input type="text" value="${text}" class="flex-grow bg-transparent text-sm focus:outline-none">
-                <button type="button" class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>
-            `;
+            div.innerHTML = `<input type="checkbox" ${checked ? 'checked' : ''} class="h-4 w-4"><input type="text" value="${text}" class="flex-grow bg-transparent text-sm focus:outline-none"><button type="button" class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>`;
             div.querySelector('button').onclick = () => div.remove();
             checklistContainer.appendChild(div);
         };
@@ -605,33 +579,23 @@
             const id = document.getElementById('taskId').value;
             const tarefa = document.getElementById('taskTarefa').value;
             const dataEntrega = document.getElementById('taskDataEntrega').value;
-            
             const checklist = [];
             checklistContainer.querySelectorAll('div.flex').forEach(item => {
                 const textInput = item.querySelector('input[type="text"]');
                 const checkInput = item.querySelector('input[type="checkbox"]');
-                if (textInput && textInput.value.trim()) {
-                    checklist.push({ text: textInput.value.trim(), checked: checkInput.checked });
-                }
+                if (textInput && textInput.value.trim()) checklist.push({ text: textInput.value.trim(), checked: checkInput.checked });
             });
-
             const originalTask = allTasksFromDB.find(t => t.id === id);
             let status = originalTask ? originalTask.status : 'todo';
             if (dataEntrega) status = 'done';
-
             const taskData = {
-                id,
-                boardId: currentBoardId,
-                status,
-                tarefa,
+                id, boardId: currentBoardId, status, tarefa,
                 solicitante: document.getElementById('taskSolicitante').value,
                 dataSolicitacao: document.getElementById('taskDataSolicitacao').value,
                 dataAgendamento: document.getElementById('taskDataAgendamento').value,
-                dataEntrega,
-                observacoes: document.getElementById('taskObservacoes').innerHTML,
+                dataEntrega, observacoes: document.getElementById('taskObservacoes').innerHTML,
                 checklist: JSON.stringify(checklist)
             };
-
             await saveTaskToFirebase(taskData);
             taskModal.classList.add('hidden');
         };
@@ -639,33 +603,24 @@
         cancelBtn.onclick = () => taskModal.classList.add('hidden');
         addTaskBtn.onclick = () => openModal();
 
-        // --- Funcionalidades IA ---
+        // --- AI ---
 
         const callGemini = async (prompt, system) => {
-            const payload = {
-                contents: [{ parts: [{ text: prompt }] }],
-                systemInstruction: { parts: [{ text: system }] }
-            };
-            const response = await fetch(geminiUrl, { method: 'POST', body: JSON.stringify(payload) });
-            if (!response.ok) throw new Error("Falha na API");
-            return await response.json();
+            const payload = { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: system }] } };
+            const resp = await fetch(geminiUrl, { method: 'POST', body: JSON.stringify(payload) });
+            return await resp.json();
         };
 
         generateAIBtn.onclick = async () => {
             const title = document.getElementById('taskTarefa').value;
-            if (!title) return alert("Digite o título da tarefa primeiro.");
-            
+            if (!title) return alert("Digite o título da tarefa.");
             generateAIBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             generateAIBtn.disabled = true;
-
             try {
-                const data = await callGemini(`Gere uma lista de 5 subtarefas para: "${title}"`, "Aja como um analista de processos. Retorne apenas uma lista simples de ações curtas separadas por quebra de linha.");
+                const data = await callGemini(`Gere 5 subtarefas para: "${title}"`, "Retorne apenas uma lista simples de ações curtas separadas por quebra de linha.");
                 const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) {
-                    text.split('\n').filter(l => l.trim()).forEach(l => addChecklistItem(l.trim().replace(/^[\d.-]\s*/, '')));
-                }
-            } catch (err) { alert("Erro ao conectar com a IA."); }
-            
+                if (text) text.split('\n').filter(l => l.trim()).forEach(l => addChecklistItem(l.trim().replace(/^[\d.-]\s*/, '')));
+            } catch (err) { alert("IA indisponível."); }
             generateAIBtn.innerHTML = '✨ Gerar com IA';
             generateAIBtn.disabled = false;
         };
@@ -673,36 +628,25 @@
         generateSummaryBtn.onclick = async () => {
             summaryModal.classList.remove('hidden');
             summaryModal.classList.add('flex');
-            summaryContent.innerHTML = '<div class="text-center p-8"><i class="fas fa-spinner fa-spin text-3xl text-purple-500"></i><p class="mt-4">Analisando dados...</p></div>';
-
+            summaryContent.innerHTML = '<div class="text-center p-8"><i class="fas fa-spinner fa-spin text-3xl text-purple-500"></i><p class="mt-4">Analisando...</p></div>';
             const tasksStr = allTasksFromDB.map(t => `- ${t.tarefa} (${t.status})`).join('\n');
             try {
-                const data = await callGemini(`Analise estas tarefas e dê um resumo motivacional:\n${tasksStr}`, "Aja como um coach de produtividade sênior. Responda em Português Brasileiro, formate com HTML simples (tags p, b, br, ul, li).");
-                summaryContent.innerHTML = data.candidates?.[0]?.content?.parts?.[0]?.text || "Não foi possível gerar o resumo.";
-            } catch (err) { summaryContent.innerHTML = "Erro ao gerar resumo."; }
+                const data = await callGemini(`Analise estas tarefas e dê um resumo motivacional:\n${tasksStr}`, "Aja como coach sênior. Responda em Português Brasileiro, formate com HTML simples.");
+                summaryContent.innerHTML = data.candidates?.[0]?.content?.parts?.[0]?.text || "Erro no resumo.";
+            } catch (err) { summaryContent.innerHTML = "IA falhou."; }
         };
 
         closeSummaryBtn.onclick = () => summaryModal.classList.add('hidden');
 
-        // --- Importação / Exportação ---
+        // --- Export/Import ---
 
         exportBtn.onclick = () => {
             const headers = "boardId;status;id;tarefa;solicitante;dataSolicitacao;dataAgendamento;dataEntrega;observacoes_b64;checklist_b64";
-            const rows = allTasksFromDB.map(t => {
-                return [
-                    t.boardId, t.status, t.id, 
-                    `"${t.tarefa.replace(/"/g, '""')}"`, `"${(t.solicitante || '').replace(/"/g, '""')}"`,
-                    t.dataSolicitacao || '', t.dataAgendamento || '', t.dataEntrega || '',
-                    btoa(unescape(encodeURIComponent(t.observacoes || ''))),
-                    btoa(unescape(encodeURIComponent(t.checklist || '')))
-                ].join(';');
-            });
+            const rows = allTasksFromDB.map(t => [t.boardId, t.status, t.id, `"${t.tarefa.replace(/"/g, '""')}"`, `"${(t.solicitante || '').replace(/"/g, '""')}"`, t.dataSolicitacao || '', t.dataAgendamento || '', t.dataEntrega || '', btoa(unescape(encodeURIComponent(t.observacoes || ''))), btoa(unescape(encodeURIComponent(t.checklist || '')))].join(';'));
             const csv = "sep=;\n" + headers + "\n" + rows.join("\n");
-            const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = "backup_tarefas_nuvem.csv";
+            a.href = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' }));
+            a.download = "backup_tarefas.csv";
             a.click();
         };
 
@@ -713,12 +657,7 @@
             const reader = new FileReader();
             reader.onload = async (event) => {
                 const lines = event.target.result.split('\n').filter(l => l.trim() && !l.startsWith('sep='));
-                if(lines.length < 2) return;
                 const headers = lines[0].split(';');
-                
-                loadingOverlay.classList.remove('hidden');
-                loadingOverlay.querySelector('p').textContent = "Importando tarefas...";
-
                 for (let i = 1; i < lines.length; i++) {
                     const values = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                     const data = {};
@@ -727,35 +666,26 @@
                         if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1).replace(/""/g, '"');
                         data[h.trim()] = val;
                     });
-
                     try {
                         if(data.observacoes_b64) data.observacoes = decodeURIComponent(escape(atob(data.observacoes_b64)));
                         if(data.checklist_b64) data.checklist = decodeURIComponent(escape(atob(data.checklist_b64)));
-                        delete data.observacoes_b64;
-                        delete data.checklist_b64;
-                    } catch(ex) { console.warn("B64 decode falhou", ex); }
-
+                        delete data.observacoes_b64; delete data.checklist_b64;
+                    } catch(ex) {}
                     await saveTaskToFirebase(data);
                 }
-                loadingOverlay.classList.add('hidden');
-                alert("Importação concluída!");
+                alert("Tarefas importadas!");
             };
             reader.readAsText(file);
         };
 
         clearAllBtn.onclick = async () => {
-            if (confirm(`Tem certeza que deseja apagar TODAS as tarefas deste painel?`)) {
-                const toDelete = allTasksFromDB.filter(t => t.boardId === currentBoardId);
-                for (const t of toDelete) {
-                    await deleteTaskFromFirebase(t.id);
-                }
+            if (confirm(`Apagar todas as tarefas deste painel?`)) {
+                allTasksFromDB.filter(t => t.boardId === currentBoardId).forEach(async t => await deleteTaskFromFirebase(t.id));
             }
         };
 
-        // Inicializar
         initApp();
         renderTabs();
-
     </script>
 </body>
 </html>
