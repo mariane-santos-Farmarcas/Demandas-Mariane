@@ -1,84 +1,134 @@
-<!-- Firebase COMPAT (GitHub Pages SAFE) -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Tarefas Interativo</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+<!-- Firebase COMPAT -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+</head>
+
+<body class="p-6 bg-gray-100">
+
+<h1 class="text-3xl font-bold mb-4">Painel de Tarefas</h1>
+
+<div class="flex gap-2 mb-6">
+<button id="addTaskBtn" class="bg-blue-600 text-white px-4 py-2 rounded">+ Adicionar Tarefa</button>
+<button id="generateSummaryBtn" class="bg-purple-600 text-white px-4 py-2 rounded">✨ Gerar Resumo</button>
+<button id="importBtn" class="bg-teal-600 text-white px-4 py-2 rounded">Importar</button>
+<button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded">Exportar / Modelo CSV</button>
+<button id="clearAllBtn" class="bg-red-500 text-white px-4 py-2 rounded">Limpar</button>
+<input type="file" id="importFile" class="hidden">
+</div>
+
+<div class="flex gap-6">
+<div class="w-1/3 bg-white p-4 rounded">
+<h3 class="font-bold text-orange-600 mb-2">A Fazer</h3>
+<div id="todo-list" class="min-h-[300px] space-y-2"></div>
+</div>
+
+<div class="w-1/3 bg-white p-4 rounded">
+<h3 class="font-bold text-blue-600 mb-2">Em Andamento</h3>
+<div id="doing-list" class="min-h-[300px] space-y-2"></div>
+</div>
+
+<div class="w-1/3 bg-white p-4 rounded">
+<h3 class="font-bold text-green-600 mb-2">Concluído</h3>
+<div id="done-list" class="min-h-[300px] space-y-2"></div>
+</div>
+</div>
+
+<!-- MODAL -->
+<div id="taskModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center">
+<div class="bg-white p-6 rounded w-full max-w-lg">
+<h2 id="modalTitle" class="text-xl font-bold mb-4">Nova Tarefa</h2>
+
+<form id="taskForm" class="space-y-3">
+<input id="taskTarefa" required placeholder="Título da tarefa" class="w-full border p-2 rounded">
+<input id="taskSolicitante" placeholder="Solicitante" class="w-full border p-2 rounded">
+<input type="date" id="taskDataAgendamento" class="w-full border p-2 rounded">
+<textarea id="taskObservacoes" placeholder="Observações" class="w-full border p-2 rounded"></textarea>
+
+<input type="hidden" id="taskId">
+
+<div class="flex justify-end gap-2">
+<button type="button" id="cancelBtn">Cancelar</button>
+<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Salvar</button>
+</div>
+</form>
+</div>
+</div>
 
 <script>
-/* ===============================
-   🔐 CONFIG FIREBASE
-   =============================== */
-const firebaseConfig = {
-    apiKey: "SUA_API_KEY",
-    authDomain: "SEU_PROJETO.firebaseapp.com",
-    projectId: "SEU_PROJETO",
-    storageBucket: "SEU_PROJETO.appspot.com",
-    messagingSenderId: "XXXXXXX",
-    appId: "SEU_APP_ID"
-};
+console.log("Painel carregado com sucesso");
 
-firebase.initializeApp(firebaseConfig);
+// 🔐 CONFIG FIREBASE
+firebase.initializeApp({
+apiKey: "SUA_API_KEY",
+authDomain: "SEU_PROJETO.firebaseapp.com",
+projectId: "SEU_PROJETO",
+storageBucket: "SEU_PROJETO.appspot.com",
+messagingSenderId: "XXXX",
+appId: "SEU_APP_ID"
+});
 
 const db = firebase.firestore();
 const auth = firebase.auth();
-const appId = "task-board-prod";
-
-/* ===============================
-   🔄 ESTADO GLOBAL
-   =============================== */
 let allTasks = [];
-let currentBoardId = "geral";
 
-/* ===============================
-   🧩 UTIL
-   =============================== */
-const showMsg = (txt) => alert(txt);
-const formatDate = d => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR") : "";
+// INIT
+document.addEventListener("DOMContentLoaded", () => {
 
-/* ===============================
-   🧱 RENDERIZAÇÃO
-   =============================== */
-function renderBoard() {
-    ["todo","doing","done"].forEach(s => {
-        document.getElementById(`${s}-list`).innerHTML = "";
-    });
+auth.signInAnonymously();
 
-    allTasks
-        .filter(t => t.boardId === currentBoardId)
-        .forEach(task => {
-            document.getElementById(`${task.status}-list`)
-                .appendChild(createCard(task));
-        });
+addTaskBtn.onclick = () => {
+taskForm.reset();
+taskId.value = "task-" + Date.now();
+taskModal.classList.remove("hidden");
+taskModal.classList.add("flex");
+};
+
+cancelBtn.onclick = () => taskModal.classList.add("hidden");
+
+taskForm.onsubmit = async e => {
+e.preventDefault();
+const data = {
+id: taskId.value,
+tarefa: taskTarefa.value,
+solicitante: taskSolicitante.value,
+dataAgendamento: taskDataAgendamento.value,
+observacoes: taskObservacoes.value,
+status: "todo"
+};
+await db.collection("tasks").doc(data.id).set(data);
+taskModal.classList.add("hidden");
+};
+
+db.collection("tasks").onSnapshot(snap => {
+allTasks = snap.docs.map(d => ({id:d.id,...d.data()}));
+render();
+});
+
+function render(){
+todo-list.innerHTML="";
+doing-list.innerHTML="";
+done-list.innerHTML="";
+allTasks.forEach(t=>{
+const d=document.createElement("div");
+d.className="p-2 bg-gray-50 rounded";
+d.textContent=t.tarefa;
+document.getElementById(`${t.status}-list`).appendChild(d);
+});
 }
 
-function createCard(task) {
-    const div = document.createElement("div");
-    div.className = "task-card bg-white p-3 rounded-md shadow-sm border";
-    div.draggable = true;
-    div.id = task.id;
+});
+</script>
 
-    div.innerHTML = `
-        <div class="card-controls absolute top-2 right-2 flex gap-2">
-            <button class="edit-btn"><i class="fas fa-pencil"></i></button>
-            <button class="del-btn"><i class="fas fa-trash"></i></button>
-        </div>
-        <h4 class="font-bold text-sm">${task.tarefa}</h4>
-        ${task.solicitante ? `<div class="text-xs">👤 ${task.solicitante}</div>` : ""}
-        ${task.dataAgendamento ? `<div class="text-xs">📅 ${formatDate(task.dataAgendamento)}</div>` : ""}
-        ${task.observacoes ? `<div class="text-xs text-gray-500 line-clamp-3">${task.observacoes}</div>` : ""}
-    `;
-
-    div.querySelector(".del-btn").onclick = () => {
-        if(confirm("Excluir tarefa?")){
-            db.collection("artifacts")
-              .doc(appId)
-              .collection("public")
-              .doc("data")
-              .collection("tasks")
-              .doc(task.id)
-              .delete();
-        }
-    };
-
-    div.querySelector(".edit-btn").onclick = () => openModal(task);
-
-    div.ondragstart = e => e.dataTransfer.set
+</body>
+</html>
