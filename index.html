@@ -94,9 +94,25 @@
             margin: 0.5rem auto;
             border-radius: 0.25rem;
         }
+        /* Custom Message Box replacement for Alert */
+        #custom-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
+
+    <!-- Toast de Notificação -->
+    <div id="custom-message"></div>
 
     <div class="max-w-7xl mx-auto">
         <header class="mb-6">
@@ -105,10 +121,10 @@
         </header>
 
         <nav id="tabs-container" class="flex border-b border-gray-300 mb-6 bg-gray-200 rounded-t-lg p-1 overflow-x-auto">
-            <!-- Tabs dinâmicas -->
+            <!-- Tabs preenchidas por JS -->
         </nav>
 
-        <!-- Painel de Produtividade -->
+        <!-- Produtividade -->
         <section id="productivity-dashboard" class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-500">
                 <h2 class="text-sm font-medium text-gray-500">Total de Tarefas</h2>
@@ -128,7 +144,7 @@
             </div>
         </section>
 
-        <!-- Controles Principais -->
+        <!-- Ações -->
         <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
              <div class="flex flex-wrap gap-2">
                 <button id="addTaskBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors flex items-center gap-2">
@@ -150,7 +166,6 @@
             </button>
         </div>
 
-        <!-- Kanban Board -->
         <main id="kanban-board" class="flex gap-6 overflow-x-auto pb-4">
             <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 min-w-[20rem] sm:w-96 sm:min-w-[24rem] flex-shrink-0" data-column-id="todo">
                 <h3 class="font-bold text-lg mb-4 text-orange-600 flex items-center gap-2"><i class="fas fa-list-check"></i>A Fazer</h3>
@@ -166,12 +181,10 @@
             </div>
         </main>
         
-        <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md p-2">
-            <!-- Tabela de resumo gerada dinamicamente -->
-        </div>
+        <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md p-2"></div>
     </div>
 
-    <!-- Modal de Tarefa -->
+    <!-- Modal Adicionar/Editar -->
     <div id="taskModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
         <div class="bg-white p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-lg m-4 max-h-[90vh] overflow-y-auto">
             <h2 id="modalTitle" class="text-2xl font-bold mb-6 text-gray-800">Nova Tarefa</h2>
@@ -205,7 +218,6 @@
                             </button>
                         </div>
                         <div id="taskObservacoes" contenteditable="true" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 min-h-[100px] overflow-y-auto bg-white focus:outline-none"></div>
-                        <p class="text-[10px] text-gray-400 mt-1">Dica: você pode colar imagens (Ctrl+V) nas observações.</p>
                     </div>
                     <div class="mb-4 col-span-1 md:col-span-2 border-t pt-4">
                         <label class="block text-gray-700 font-medium mb-1">Checklist de Ações</label>
@@ -225,7 +237,7 @@
         </div>
     </div>
 
-    <!-- Modal Resumo IA -->
+    <!-- Modal IA -->
     <div id="summaryModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
         <div class="bg-white p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-2xl m-4 max-h-[80vh] flex flex-col">
             <div class="flex justify-between items-center mb-4 pb-4 border-b">
@@ -236,25 +248,22 @@
         </div>
     </div>
 
-    <!-- Firebase Scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Configuração Firebase
+        // Configurações
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-board-app';
-
-        // Configuração Gemini API
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-task-app';
         const apiKey = "";
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
-        // Estado da Aplicação
-        let allTasksFromDB = [];
+        // Estado
+        let allTasks = [];
         let currentBoardId = 'geral';
         const boards = [
             { id: 'consolidado', name: 'Consolidado' },
@@ -265,146 +274,113 @@
         ];
 
         // Elementos DOM
-        const tabsContainer = document.getElementById('tabs-container');
-        const boardTitleEl = document.getElementById('board-title');
-        const addTaskBtn = document.getElementById('addTaskBtn');
-        const taskModal = document.getElementById('taskModal');
-        const taskForm = document.getElementById('taskForm');
-        const cancelBtn = document.getElementById('cancelBtn');
-        const modalTitle = document.getElementById('modalTitle');
-        const generateAIBtn = document.getElementById('generateAIBtn');
-        const generateSummaryBtn = document.getElementById('generateSummaryBtn');
-        const summaryModal = document.getElementById('summaryModal');
-        const closeSummaryBtn = document.getElementById('closeSummaryBtn');
-        const summaryContent = document.getElementById('summaryContent');
-        const checklistContainer = document.getElementById('checklist-container');
-        const checklistItemInput = document.getElementById('checklistItemInput');
-        const addChecklistItemBtn = document.getElementById('addChecklistItemBtn');
-        const importBtn = document.getElementById('importBtn');
-        const importFile = document.getElementById('importFile');
-        const exportBtn = document.getElementById('exportBtn');
-        const clearAllBtn = document.getElementById('clearAllBtn');
-        
-        const columnLists = {
-            todo: document.getElementById('todo-list'),
-            doing: document.getElementById('doing-list'),
-            done: document.getElementById('done-list')
+        const els = {
+            tabs: document.getElementById('tabs-container'),
+            title: document.getElementById('board-title'),
+            kanban: document.getElementById('kanban-board'),
+            consolidated: document.getElementById('consolidated-view'),
+            addTaskBtn: document.getElementById('addTaskBtn'),
+            taskModal: document.getElementById('taskModal'),
+            taskForm: document.getElementById('taskForm'),
+            cancelBtn: document.getElementById('cancelBtn'),
+            generateSummaryBtn: document.getElementById('generateSummaryBtn'),
+            summaryModal: document.getElementById('summaryModal'),
+            closeSummaryBtn: document.getElementById('closeSummaryBtn'),
+            summaryContent: document.getElementById('summaryContent'),
+            checklist: document.getElementById('checklist-container'),
+            addChecklistItemBtn: document.getElementById('addChecklistItemBtn'),
+            checklistItemInput: document.getElementById('checklistItemInput'),
+            importBtn: document.getElementById('importBtn'),
+            importFile: document.getElementById('importFile'),
+            exportBtn: document.getElementById('exportBtn'),
+            clearAllBtn: document.getElementById('clearAllBtn'),
+            observations: document.getElementById('taskObservacoes'),
+            columns: {
+                todo: document.getElementById('todo-list'),
+                doing: document.getElementById('doing-list'),
+                done: document.getElementById('done-list')
+            }
         };
 
-        // --- Firebase Auth & Sync ---
+        // --- Notificação ---
+        const showMsg = (txt, color='bg-blue-600') => {
+            const m = document.getElementById('custom-message');
+            m.textContent = txt;
+            m.className = `${color} fixed top-5 right-5 p-4 rounded text-white shadow-lg z-[3000]`;
+            m.style.display = 'block';
+            setTimeout(() => { m.style.display = 'none'; }, 3000);
+        };
 
-        const initApp = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Auth falhou:", error);
+        // --- Firebase Auth ---
+        const start = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
             }
         };
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                setupRealtimeSync();
+                const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
+                onSnapshot(tasksRef, (snap) => {
+                    allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    renderBoard();
+                    renderDash();
+                }, (err) => console.error("Sync Error", err));
             }
         });
 
-        const setupRealtimeSync = () => {
-            const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
-            onSnapshot(tasksRef, (snapshot) => {
-                allTasksFromDB = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderCurrentBoard();
-                updateDashboard();
-            }, (error) => {
-                console.error("Erro Firestore sync:", error);
-            });
+        // --- Renderização ---
+        const renderDash = () => {
+            document.getElementById('total-tasks').textContent = allTasks.length;
+            document.getElementById('todo-tasks').textContent = allTasks.filter(t => t.status === 'todo').length;
+            document.getElementById('doing-tasks').textContent = allTasks.filter(t => t.status === 'doing').length;
+            document.getElementById('done-tasks').textContent = allTasks.filter(t => t.status === 'done').length;
         };
-
-        const saveTaskToFirebase = async (taskData) => {
-            const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskData.id);
-            await setDoc(taskRef, taskData);
-        };
-
-        const deleteTaskFromFirebase = async (taskId) => {
-            const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskId);
-            await deleteDoc(taskRef);
-        };
-
-        // --- UI Rendering ---
 
         const renderTabs = () => {
-            tabsContainer.innerHTML = '';
-            boards.forEach(board => {
+            els.tabs.innerHTML = '';
+            boards.forEach(b => {
                 const btn = document.createElement('button');
-                btn.className = `tab-btn flex-1 text-gray-600 py-3 px-4 border-b-2 border-transparent text-sm md:text-base whitespace-nowrap ${currentBoardId === board.id ? 'active' : ''}`;
-                btn.textContent = board.name;
-                btn.onclick = () => {
-                    currentBoardId = board.id;
-                    renderTabs();
-                    renderCurrentBoard();
-                };
-                tabsContainer.appendChild(btn);
+                btn.className = `tab-btn flex-1 text-gray-600 py-3 px-4 border-b-2 border-transparent text-sm md:text-base whitespace-nowrap ${currentBoardId === b.id ? 'active' : ''}`;
+                btn.textContent = b.name;
+                btn.onclick = () => { currentBoardId = b.id; renderTabs(); renderBoard(); };
+                els.tabs.appendChild(btn);
             });
         };
 
-        const renderCurrentBoard = () => {
-            boardTitleEl.textContent = boards.find(b => b.id === currentBoardId).name;
+        const renderBoard = () => {
+            els.title.textContent = boards.find(b => b.id === currentBoardId).name;
+            const isConsol = currentBoardId === 'consolidado';
             
-            const kanbanBoard = document.getElementById('kanban-board');
-            const consolidatedView = document.getElementById('consolidated-view');
+            els.kanban.style.display = isConsol ? 'none' : 'flex';
+            els.consolidated.style.display = isConsol ? 'block' : 'none';
+            els.addTaskBtn.style.display = isConsol ? 'none' : 'flex';
+            els.importBtn.style.display = isConsol ? 'none' : 'flex';
+            els.exportBtn.style.display = isConsol ? 'none' : 'flex';
+            els.clearAllBtn.style.display = isConsol ? 'none' : 'flex';
 
-            const isConsolidated = currentBoardId === 'consolidado';
-            kanbanBoard.style.display = isConsolidated ? 'none' : 'flex';
-            consolidatedView.style.display = isConsolidated ? 'block' : 'none';
-            addTaskBtn.style.display = isConsolidated ? 'none' : 'flex';
-            importBtn.style.display = isConsolidated ? 'none' : 'flex';
-            exportBtn.style.display = isConsolidated ? 'none' : 'flex';
-            clearAllBtn.style.display = isConsolidated ? 'none' : 'flex';
-
-            if (isConsolidated) {
-                renderConsolidatedTable();
+            if (isConsol) {
+                renderTable();
             } else {
-                Object.keys(columnLists).forEach(id => columnLists[id].innerHTML = '');
-                const boardTasks = allTasksFromDB.filter(t => t.boardId === currentBoardId);
-                boardTasks.forEach(task => {
-                    const card = createTaskCard(task);
-                    if (columnLists[task.status]) {
-                        columnLists[task.status].appendChild(card);
-                    }
+                Object.values(els.columns).forEach(c => c.innerHTML = '');
+                allTasks.filter(t => t.boardId === currentBoardId).forEach(t => {
+                    const card = createCard(t);
+                    if (els.columns[t.status]) els.columns[t.status].appendChild(card);
                 });
             }
         };
 
-        const createTaskCard = (task) => {
-            const card = document.createElement('div');
-            card.id = task.id;
-            card.draggable = true;
-            card.className = 'task-card bg-white p-3 rounded-md shadow-sm border border-gray-200 relative mb-4';
-            
-            const formatDateStr = (ds) => ds ? new Date(ds + "T12:00:00").toLocaleDateString('pt-BR') : '';
-            
-            let checklistSummary = '';
-            if (task.checklist) {
-                try {
-                    const items = JSON.parse(task.checklist);
-                    if (items.length > 0) {
-                        const done = items.filter(i => i.checked).length;
-                        const progress = Math.round((done / items.length) * 100);
-                        checklistSummary = `
-                            <div class="mt-3 pt-2 border-t border-dashed text-left">
-                                <div class="flex justify-between text-[10px] text-gray-500 mb-1"><span>Ações</span><span>${done}/${items.length}</span></div>
-                                <div class="w-full bg-gray-100 rounded-full h-1"><div class="bg-green-500 h-1 rounded-full" style="width:${progress}%"></div></div>
-                                <div class="checklist-details mt-2 space-y-1">
-                                    ${items.map(i => `<div class="text-[10px] flex items-center gap-1 ${i.checked ? 'line-through text-gray-400' : 'text-gray-600'}"><i class="far ${i.checked ? 'fa-check-square' : 'fa-square'}"></i>${i.text}</div>`).join('')}
-                                </div>
-                            </div>`;
-                    }
-                } catch(e) {}
-            }
+        const createCard = (task) => {
+            const div = document.createElement('div');
+            div.className = 'task-card bg-white p-3 rounded-md shadow-sm border border-gray-200 relative mb-4';
+            div.id = task.id;
+            div.draggable = true;
 
-            card.innerHTML = `
+            const fmtDate = (d) => d ? new Date(d + "T12:00:00").toLocaleDateString('pt-BR') : '';
+
+            div.innerHTML = `
                 <div class="card-controls absolute top-2 right-2 flex gap-2">
                     <button class="dup-btn text-gray-300 hover:text-green-500"><i class="fas fa-clone fa-xs"></i></button>
                     <button class="edit-btn text-gray-300 hover:text-blue-500"><i class="fas fa-pencil fa-xs"></i></button>
@@ -413,286 +389,199 @@
                 <h4 class="font-bold text-gray-800 text-sm pr-12 text-left">${task.tarefa}</h4>
                 ${task.solicitante ? `<div class="task-detail mt-1 text-left"><i class="fas fa-user text-[10px]"></i><span class="text-xs">${task.solicitante}</span></div>` : ''}
                 <div class="mt-2 space-y-0.5 border-t pt-2 text-left">
-                    ${task.dataAgendamento ? `<div class="task-detail"><i class="fas fa-calendar-day text-[10px]"></i><span class="text-[10px]">Agendado: ${formatDateStr(task.dataAgendamento)}</span></div>` : ''}
-                    ${task.dataEntrega ? `<div class="task-detail"><i class="fas fa-check-circle text-[10px] text-green-500"></i><span class="text-[10px] font-bold text-green-600">Entregue: ${formatDateStr(task.dataEntrega)}</span></div>` : ''}
+                    ${task.dataAgendamento ? `<div class="task-detail"><i class="fas fa-calendar-day text-[10px]"></i><span class="text-[10px]">Agendado: ${fmtDate(task.dataAgendamento)}</span></div>` : ''}
+                    ${task.dataEntrega ? `<div class="task-detail"><i class="fas fa-check-circle text-[10px] text-green-500"></i><span class="text-[10px] font-bold text-green-600">Entregue: ${fmtDate(task.dataEntrega)}</span></div>` : ''}
                 </div>
                 ${task.observacoes ? `<div class="task-observations text-[10px] text-gray-500 mt-2 line-clamp-3 overflow-hidden text-left">${task.observacoes}</div>` : ''}
-                ${checklistSummary}
             `;
 
-            card.querySelector('.del-btn').onclick = () => { if(confirm("Excluir esta tarefa?")) deleteTaskFromFirebase(task.id); };
-            card.querySelector('.edit-btn').onclick = () => openModal(task);
-            card.querySelector('.dup-btn').onclick = () => {
-                const newTask = {...task, id: 'task-' + Date.now()};
-                openModal(newTask, true);
-            };
+            div.querySelector('.del-btn').onclick = () => { if(confirm("Excluir?")) deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id)); };
+            div.querySelector('.edit-btn').onclick = () => openModal(task);
+            div.querySelector('.dup-btn').onclick = () => openModal({...task, id: 'task-'+Date.now()}, true);
+            div.ondragstart = (e) => e.dataTransfer.setData('text', task.id);
 
-            card.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', task.id);
-                card.style.opacity = '0.5';
-            });
-            card.addEventListener('dragend', () => card.style.opacity = '1');
-
-            return card;
+            return div;
         };
 
-        const renderConsolidatedTable = () => {
-            const consolidatedView = document.getElementById('consolidated-view');
-            if (allTasksFromDB.length === 0) {
-                consolidatedView.innerHTML = '<p class="p-8 text-center text-gray-400">Nenhuma tarefa cadastrada.</p>';
-                return;
-            }
-
-            const today = new Date();
-            today.setHours(0,0,0,0);
-
-            let html = `
+        const renderTable = () => {
+            els.consolidated.innerHTML = `
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm border-collapse min-w-[600px]">
-                        <thead>
-                            <tr class="bg-gray-100">
-                                <th class="p-3 border">Solicitante</th>
-                                <th class="p-3 border">Tarefa</th>
-                                <th class="p-3 border">Prazo</th>
-                                <th class="p-3 border">Status</th>
-                            </tr>
+                        <thead class="bg-gray-100">
+                            <tr><th class="p-3 border">Solicitante</th><th class="p-3 border">Tarefa</th><th class="p-3 border">Prazo</th><th class="p-3 border">Status</th></tr>
                         </thead>
-                        <tbody>`;
-            
-            allTasksFromDB.forEach(t => {
-                let prazoHtml = '-';
-                if (t.status === 'done' && t.dataEntrega) {
-                    prazoHtml = `<span class="text-green-600 font-medium">Entregue</span>`;
-                } else if (t.dataAgendamento) {
-                    const due = new Date(t.dataAgendamento + "T00:00:00");
-                    const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
-                    if (diffDays < 0) prazoHtml = `<span class="text-red-500 font-bold">Atrasado ${Math.abs(diffDays)}d</span>`;
-                    else if (diffDays === 0) prazoHtml = `<span class="text-orange-500 font-bold">Vence hoje</span>`;
-                    else if (diffDays <= 30) prazoHtml = `<span>${diffDays} dias</span>`;
-                    else prazoHtml = `<span>~${Math.floor(diffDays/30)} meses</span>`;
-                }
-
-                const statusMap = { todo: 'A Fazer', doing: 'Em Andamento', done: 'Concluído' };
-                const colorMap = { todo: 'bg-orange-100 text-orange-700', doing: 'bg-blue-100 text-blue-700', done: 'bg-green-100 text-green-700' };
-
-                html += `
-                    <tr>
-                        <td class="p-3 border text-gray-600">${t.solicitante || '-'}</td>
-                        <td class="p-3 border font-medium text-gray-800">${t.tarefa}</td>
-                        <td class="p-3 border">${prazoHtml}</td>
-                        <td class="p-3 border">
-                            <span class="px-2 py-1 rounded-full text-[10px] font-bold ${colorMap[t.status]}">${statusMap[t.status]}</span>
-                        </td>
-                    </tr>`;
-            });
-
-            html += `</tbody></table></div>`;
-            consolidatedView.innerHTML = html;
+                        <tbody>${allTasks.map(t => {
+                            const stMap = {todo:'A Fazer', doing:'Em Andamento', done:'Concluído'};
+                            const stCol = {todo:'bg-orange-100 text-orange-700', doing:'bg-blue-100 text-blue-700', done:'bg-green-100 text-green-700'};
+                            return `<tr><td class="p-3 border">${t.solicitante || '-'}</td><td class="p-3 border font-medium">${t.tarefa}</td><td class="p-3 border">${t.dataAgendamento || '-'}</td><td class="p-3 border"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${stCol[t.status]}">${stMap[t.status]}</span></td></tr>`;
+                        }).join('')}</tbody>
+                    </table>
+                </div>`;
         };
 
-        const updateDashboard = () => {
-            document.getElementById('total-tasks').textContent = allTasksFromDB.length;
-            document.getElementById('todo-tasks').textContent = allTasksFromDB.filter(t => t.status === 'todo').length;
-            document.getElementById('doing-tasks').textContent = allTasksFromDB.filter(t => t.status === 'doing').length;
-            document.getElementById('done-tasks').textContent = allTasksFromDB.filter(t => t.status === 'done').length;
-        };
-
-        // --- Drag and Drop ---
-
-        document.querySelectorAll('.task-column').forEach(col => {
-            col.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('drag-over'); });
-            col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
-            col.addEventListener('drop', async (e) => {
-                e.preventDefault();
-                col.classList.remove('drag-over');
-                const draggedId = e.dataTransfer.getData('text/plain');
-                const newStatus = col.dataset.columnId;
-                const task = allTasksFromDB.find(t => t.id === draggedId);
-                if (task && task.status !== newStatus) {
-                    const updatedTask = { ...task, status: newStatus };
-                    if (newStatus === 'done' && !updatedTask.dataEntrega) {
-                        updatedTask.dataEntrega = new Date().toISOString().split('T')[0];
-                    }
-                    await saveTaskToFirebase(updatedTask);
-                }
-            });
-        });
-
-        // --- Modal ---
-
-        const openModal = (task = null, isDup = false) => {
-            taskForm.reset();
-            document.getElementById('taskObservacoes').innerHTML = '';
-            checklistContainer.innerHTML = '';
-            
-            if (task) {
-                modalTitle.textContent = isDup ? 'Duplicar Tarefa' : 'Editar Tarefa';
-                document.getElementById('taskId').value = isDup ? 'task-' + Date.now() : task.id;
-                document.getElementById('taskTarefa').value = task.tarefa;
-                document.getElementById('taskSolicitante').value = task.solicitante || '';
-                document.getElementById('taskDataSolicitacao').value = task.dataSolicitacao || '';
-                document.getElementById('taskDataAgendamento').value = task.dataAgendamento || '';
-                document.getElementById('taskDataEntrega').value = task.dataEntrega || '';
-                document.getElementById('taskObservacoes').innerHTML = task.observacoes || '';
-                if (task.checklist) {
-                    try {
-                        JSON.parse(task.checklist).forEach(i => addChecklistItem(i.text, i.checked));
-                    } catch(e) {}
-                }
+        // --- Modais e Forms ---
+        const openModal = (t = null, isDup = false) => {
+            els.taskForm.reset();
+            els.observations.innerHTML = '';
+            els.checklist.innerHTML = '';
+            if (t) {
+                document.getElementById('taskId').value = isDup ? 'task-'+Date.now() : t.id;
+                document.getElementById('taskTarefa').value = t.tarefa;
+                document.getElementById('taskSolicitante').value = t.solicitante || '';
+                document.getElementById('taskDataSolicitacao').value = t.dataSolicitacao || '';
+                document.getElementById('taskDataAgendamento').value = t.dataAgendamento || '';
+                document.getElementById('taskDataEntrega').value = t.dataEntrega || '';
+                els.observations.innerHTML = t.observacoes || '';
+                if(t.checklist) JSON.parse(t.checklist).forEach(i => addItem(i.text, i.checked));
             } else {
-                modalTitle.textContent = 'Nova Tarefa';
-                document.getElementById('taskId').value = 'task-' + Date.now();
+                document.getElementById('taskId').value = 'task-'+Date.now();
             }
-            taskModal.classList.remove('hidden');
-            taskModal.classList.add('flex');
+            els.taskModal.classList.remove('hidden');
+            els.taskModal.classList.add('flex');
         };
 
-        const addChecklistItem = (text, checked = false) => {
-            const div = document.createElement('div');
-            div.className = 'flex items-center gap-2 bg-gray-50 p-2 rounded mb-2';
-            div.innerHTML = `<input type="checkbox" ${checked ? 'checked' : ''} class="h-4 w-4"><input type="text" value="${text}" class="flex-grow bg-transparent text-sm focus:outline-none"><button type="button" class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>`;
-            div.querySelector('button').onclick = () => div.remove();
-            checklistContainer.appendChild(div);
+        const addItem = (txt, chk = false) => {
+            const d = document.createElement('div');
+            d.className = 'flex items-center gap-2 bg-gray-50 p-2 mb-2 rounded';
+            d.innerHTML = `<input type="checkbox" ${chk?'checked':''} class="h-4 w-4"><input type="text" value="${txt}" class="flex-grow bg-transparent text-sm focus:outline-none"><button type="button" class="text-red-400"><i class="fas fa-times"></i></button>`;
+            d.querySelector('button').onclick = () => d.remove();
+            els.checklist.appendChild(d);
         };
 
-        addChecklistItemBtn.onclick = () => {
-            const val = checklistItemInput.value.trim();
-            if (val) { addChecklistItem(val); checklistItemInput.value = ''; }
-        };
+        // Eventos
+        els.addTaskBtn.onclick = () => openModal();
+        els.cancelBtn.onclick = () => els.taskModal.classList.add('hidden');
+        els.addChecklistItemBtn.onclick = () => { if(els.checklistItemInput.value) { addItem(els.checklistItemInput.value); els.checklistItemInput.value=''; } };
 
-        document.getElementById('taskObservacoes').addEventListener('paste', (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (const item of items) {
-                if (item.type.indexOf('image') === 0) {
-                    const blob = item.getAsFile();
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const img = document.createElement('img');
-                        img.src = event.target.result;
-                        document.getElementById('taskObservacoes').appendChild(img);
-                    };
-                    reader.readAsDataURL(blob);
-                }
-            }
-        });
-
-        taskForm.onsubmit = async (e) => {
+        els.taskForm.onsubmit = async (e) => {
             e.preventDefault();
             const id = document.getElementById('taskId').value;
-            const dataEntrega = document.getElementById('taskDataEntrega').value;
+            const entrega = document.getElementById('taskDataEntrega').value;
             const checklist = [];
-            checklistContainer.querySelectorAll('div.flex').forEach(item => {
-                const textInput = item.querySelector('input[type="text"]');
-                const checkInput = item.querySelector('input[type="checkbox"]');
-                if (textInput && textInput.value.trim()) checklist.push({ text: textInput.value.trim(), checked: checkInput.checked });
+            els.checklist.querySelectorAll('div.flex').forEach(item => {
+                const text = item.querySelector('input[type="text"]').value;
+                if(text) checklist.push({ text, checked: item.querySelector('input[type="checkbox"]').checked });
             });
-            const originalTask = allTasksFromDB.find(t => t.id === id);
-            let status = originalTask ? originalTask.status : 'todo';
-            if (dataEntrega) status = 'done';
-            const taskData = {
-                id, boardId: currentBoardId, status, tarefa: document.getElementById('taskTarefa').value,
+            const old = allTasks.find(x => x.id === id);
+            let st = old ? old.status : 'todo';
+            if (entrega) st = 'done';
+
+            const data = {
+                id, boardId: currentBoardId, status: st,
+                tarefa: document.getElementById('taskTarefa').value,
                 solicitante: document.getElementById('taskSolicitante').value,
                 dataSolicitacao: document.getElementById('taskDataSolicitacao').value,
                 dataAgendamento: document.getElementById('taskDataAgendamento').value,
-                dataEntrega, observacoes: document.getElementById('taskObservacoes').innerHTML,
+                dataEntrega: entrega,
+                observacoes: els.observations.innerHTML,
                 checklist: JSON.stringify(checklist)
             };
-            await saveTaskToFirebase(taskData);
-            taskModal.classList.add('hidden');
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', id), data);
+            els.taskModal.classList.add('hidden');
+            showMsg("Tarefa Salva!");
         };
 
-        cancelBtn.onclick = () => taskModal.classList.add('hidden');
-        addTaskBtn.onclick = () => openModal();
+        // --- Drag and Drop Logic ---
+        document.querySelectorAll('.task-column').forEach(col => {
+            col.ondragover = (e) => { e.preventDefault(); col.classList.add('drag-over'); };
+            col.ondragleave = () => col.classList.remove('drag-over');
+            col.ondrop = async (e) => {
+                e.preventDefault();
+                col.classList.remove('drag-over');
+                const tid = e.dataTransfer.getData('text');
+                const task = allTasks.find(t => t.id === tid);
+                if (task && task.status !== col.dataset.columnId) {
+                    const up = { ...task, status: col.dataset.columnId };
+                    if (up.status === 'done' && !up.dataEntrega) up.dataEntrega = new Date().toISOString().split('T')[0];
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', tid), up);
+                }
+            };
+        });
 
-        // --- IA Helpers ---
-
-        const callGemini = async (prompt, system) => {
-            const payload = { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: system }] } };
-            const resp = await fetch(geminiUrl, { method: 'POST', body: JSON.stringify(payload) });
+        // IA
+        const callAI = async (prompt, system) => {
+            const resp = await fetch(geminiUrl, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: system }] } }) });
             return await resp.json();
         };
 
-        generateAIBtn.onclick = async () => {
-            const title = document.getElementById('taskTarefa').value;
-            if (!title) return alert("Digite o título da tarefa.");
-            generateAIBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            generateAIBtn.disabled = true;
+        document.getElementById('generateAIBtn').onclick = async () => {
+            const t = document.getElementById('taskTarefa').value;
+            if(!t) return;
+            const btn = document.getElementById('generateAIBtn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             try {
-                const data = await callGemini(`Gere 5 subtarefas curtas para: "${title}"`, "Retorne apenas uma lista simples de ações curtas separadas por quebra de linha, sem números.");
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) text.split('\n').filter(l => l.trim()).forEach(l => addChecklistItem(l.trim().replace(/^[\d.-]\s*/, '')));
-            } catch (err) { alert("IA temporariamente indisponível."); }
-            generateAIBtn.innerHTML = '✨ Gerar com IA';
-            generateAIBtn.disabled = false;
+                const res = await callAI(`Subtarefas para: "${t}"`, "Retorne apenas uma lista simples de 5 ações curtas separadas por quebra de linha.");
+                res.candidates[0].content.parts[0].text.split('\n').forEach(l => { if(l.trim()) addItem(l.trim().replace(/^[\d.-]\s*/, '')); });
+            } catch(e) { showMsg("IA falhou", "bg-red-500"); }
+            btn.innerHTML = '✨ Gerar com IA';
         };
 
-        generateSummaryBtn.onclick = async () => {
-            summaryModal.classList.remove('hidden');
-            summaryModal.classList.add('flex');
-            summaryContent.innerHTML = '<div class="text-center p-8"><i class="fas fa-spinner fa-spin text-3xl text-purple-500"></i><p class="mt-4 text-gray-600">IA analisando sua produtividade...</p></div>';
-            const tasksStr = allTasksFromDB.map(t => `- ${t.tarefa} (${t.status})`).join('\n');
+        els.generateSummaryBtn.onclick = async () => {
+            els.summaryModal.classList.remove('hidden');
+            els.summaryModal.classList.add('flex');
+            els.summaryContent.innerHTML = '<p class="text-center p-8">Analisando...</p>';
             try {
-                const data = await callGemini(`Analise estas tarefas e dê um resumo motivacional curto:\n${tasksStr}`, "Aja como coach de produtividade. Responda em Português Brasileiro, formate com HTML simples (p, b, ul, li).");
-                summaryContent.innerHTML = data.candidates?.[0]?.content?.parts?.[0]?.text || "Não foi possível gerar o resumo.";
-            } catch (err) { summaryContent.innerHTML = "Falha na conexão com a IA."; }
+                const res = await callAI(`Resuma motivacionalmente:\n${allTasks.map(t=>t.tarefa).join(', ')}`, "Aja como coach sênior. Responda em Português HTML simples.");
+                els.summaryContent.innerHTML = res.candidates[0].content.parts[0].text;
+            } catch(e) { els.summaryContent.innerHTML = "Erro IA."; }
         };
+        els.closeSummaryBtn.onclick = () => els.summaryModal.classList.add('hidden');
 
-        closeSummaryBtn.onclick = () => summaryModal.classList.add('hidden');
-
-        // --- CSV Operations ---
-
-        exportBtn.onclick = () => {
-            const headers = "boardId;status;id;tarefa;solicitante;dataSolicitacao;dataAgendamento;dataEntrega;observacoes_b64;checklist_b64";
-            const rows = allTasksFromDB.map(t => [
-                t.boardId, t.status, t.id, 
-                `"${t.tarefa.replace(/"/g, '""')}"`, `"${(t.solicitante || '').replace(/"/g, '""')}"`,
-                t.dataSolicitacao || '', t.dataAgendamento || '', t.dataEntrega || '',
-                btoa(unescape(encodeURIComponent(t.observacoes || ''))),
-                btoa(unescape(encodeURIComponent(t.checklist || '')))
-            ].join(';'));
-            const csv = "sep=;\n" + headers + "\n" + rows.join("\n");
+        // CSV
+        els.exportBtn.onclick = () => {
+            const h = "boardId;status;id;tarefa;solicitante;dataSolicitacao;dataAgendamento;dataEntrega;observacoes_b64;checklist_b64";
+            const r = allTasks.map(t => [t.boardId, t.status, t.id, `"${t.tarefa}"`, `"${t.solicitante||''}"`, t.dataSolicitacao||'', t.dataAgendamento||'', t.dataEntrega||'', btoa(unescape(encodeURIComponent(t.observacoes||''))), btoa(unescape(encodeURIComponent(t.checklist||'')))].join(';'));
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' }));
-            a.download = "backup_nuvem_tarefas.csv";
-            a.click();
+            a.href = URL.createObjectURL(new Blob(["\uFEFFsep=;\n" + h + "\n" + r.join("\n")], { type: 'text/csv;charset=utf-8;' }));
+            a.download = "backup.csv"; a.click();
         };
 
-        importBtn.onclick = () => importFile.click();
-        importFile.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                const lines = event.target.result.split('\n').filter(l => l.trim() && !l.startsWith('sep='));
-                if(lines.length < 2) return alert("Arquivo vazio.");
+        els.importBtn.onclick = () => els.importFile.click();
+        els.importFile.onchange = async (e) => {
+            const f = e.target.files[0]; if(!f) return;
+            const r = new FileReader();
+            r.onload = async (ev) => {
+                const lines = ev.target.result.split('\n').filter(l => l.trim() && !l.startsWith('sep='));
                 const headers = lines[0].split(';');
                 for (let i = 1; i < lines.length; i++) {
-                    const values = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    const vals = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                     const data = {};
                     headers.forEach((h, idx) => {
-                        let val = (values[idx] || '').trim();
-                        if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1).replace(/""/g, '"');
-                        data[h.trim()] = val;
+                        let v = (vals[idx] || '').trim();
+                        if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1).replace(/""/g, '"');
+                        data[h.trim()] = v;
                     });
                     try {
                         if(data.observacoes_b64) data.observacoes = decodeURIComponent(escape(atob(data.observacoes_b64)));
                         if(data.checklist_b64) data.checklist = decodeURIComponent(escape(atob(data.checklist_b64)));
                         delete data.observacoes_b64; delete data.checklist_b64;
                     } catch(ex) {}
-                    await saveTaskToFirebase(data);
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', data.id), data);
                 }
-                alert("Importação concluída com sucesso!");
+                showMsg("Importação concluída!", "bg-teal-600");
             };
-            reader.readAsText(file);
+            r.readAsText(f);
         };
 
-        clearAllBtn.onclick = async () => {
-            if (confirm(`Tem certeza que deseja apagar TODAS as tarefas deste painel?`)) {
-                allTasksFromDB.filter(t => t.boardId === currentBoardId).forEach(async t => await deleteTaskFromFirebase(t.id));
+        els.clearAllBtn.onclick = () => {
+            if (confirm("Apagar painel atual?")) {
+                allTasks.filter(t => t.boardId === currentBoardId).forEach(t => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id)));
             }
         };
 
-        initApp();
+        // Colar imagem
+        els.observations.onpaste = (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (const item of items) {
+                if (item.type.indexOf('image') === 0) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => { const img = document.createElement('img'); img.src = ev.target.result; els.observations.appendChild(img); };
+                    reader.readAsDataURL(item.getAsFile());
+                }
+            }
+        };
+
+        await start();
         renderTabs();
     </script>
 </body>
