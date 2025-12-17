@@ -1,616 +1,183 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Tarefas Interativo - Cloud Sync</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Painel de Tarefas Interativo</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f0f2f5;
-        }
-        .task-card {
-            cursor: grab;
-            transition: all 0.2s ease-in-out;
-        }
-        .task-card .card-controls {
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-        }
-        .task-card:hover .card-controls {
-            opacity: 1;
-        }
-        .task-card .checklist-details {
-            display: none;
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
-        }
-        .task-card:hover .checklist-details {
-            display: block;
-            max-height: 200px;
-        }
-        .task-card.no-drag {
-            cursor: default;
-        }
-        .task-card:active {
-            cursor: grabbing;
-            transform: scale(1.02);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }
-        .task-column.drag-over {
-            border-style: dashed;
-            border-color: #3b82f6;
-            background-color: #eff6ff;
-        }
-        .task-list::-webkit-scrollbar,
-        #kanban-board::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        .task-list::-webkit-scrollbar-track,
-        #kanban-board::-webkit-scrollbar-track {
-            background: #e2e8f0;
-            border-radius: 10px;
-        }
-        .task-list::-webkit-scrollbar-thumb,
-        #kanban-board::-webkit-scrollbar-thumb {
-            background-color: #94a3b8;
-            border-radius: 10px;
-        }
-        .tab-btn {
-            transition: all 0.2s ease-in-out;
-        }
-        .tab-btn.active {
-            background-color: #ffffff;
-            color: #2563eb;
-            border-bottom-color: #2563eb;
-            font-weight: 600;
-        }
-        .task-detail {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.8rem;
-            color: #4a5568;
-        }
-        .task-detail i {
-            width: 14px;
-            text-align: center;
-        }
-        .task-observations img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 0.25rem;
-            margin-top: 0.5rem;
-        }
-        #taskObservacoes img {
-            max-width: 90%;
-            height: auto;
-            display: block;
-            margin: 0.5rem auto;
-            border-radius: 0.25rem;
-        }
-        #custom-message {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            border-radius: 8px;
-            color: white;
-            font-weight: bold;
-            z-index: 3000;
-            display: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
+        body { font-family: 'Inter', sans-serif; background:#f0f2f5 }
+        .task-card { cursor: grab; transition:.2s }
+        .card-controls { opacity:0; transition:.2s }
+        .task-card:hover .card-controls { opacity:1 }
+        .task-column.drag-over { border:2px dashed #3b82f6; background:#eff6ff }
     </style>
 </head>
+
 <body class="p-4 md:p-8">
+<div id="custom-message"></div>
 
-    <div id="custom-message"></div>
+<div class="max-w-7xl mx-auto">
+    <h1 id="board-title" class="text-3xl font-bold mb-4">Painel de Tarefas</h1>
 
-    <div class="max-w-7xl mx-auto">
-        <header class="mb-6">
-            <h1 id="board-title" class="text-3xl md:text-4xl font-bold text-gray-800 text-center md:text-left">Painel de Tarefas</h1>
-            <p class="text-gray-500 mt-1 text-center md:text-left">Organização em nuvem sincronizada em tempo real.</p>
-        </header>
-
-        <nav id="tabs-container" class="flex border-b border-gray-300 mb-6 bg-gray-200 rounded-t-lg p-1 overflow-x-auto">
-            <!-- Tabs preenchidas por JS -->
-        </nav>
-
-        <section id="productivity-dashboard" class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-500">
-                <h2 class="text-sm font-medium text-gray-500">Total</h2>
-                <p id="total-tasks" class="text-3xl font-bold text-gray-800">0</p>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-orange-500">
-                <h2 class="text-sm font-medium text-gray-500">A Fazer</h2>
-                <p id="todo-tasks" class="text-3xl font-bold text-orange-500">0</p>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
-                <h2 class="text-sm font-medium text-gray-500">Em Andamento</h2>
-                <p id="doing-tasks" class="text-3xl font-bold text-blue-500">0</p>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
-                <h2 class="text-sm font-medium text-gray-500">Concluídas</h2>
-                <p id="done-tasks" class="text-3xl font-bold text-green-500">0</p>
-            </div>
-        </section>
-
-        <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
-             <div class="flex flex-wrap gap-2">
-                <button id="addTaskBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors flex items-center gap-2">
-                    <i class="fas fa-plus"></i> Adicionar Tarefa
-                </button>
-                <button id="generateSummaryBtn" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-purple-700 transition-colors flex items-center gap-2">
-                    ✨ Gerar Resumo
-                </button>
-                <button id="importBtn" class="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-teal-700 transition-colors flex items-center gap-2">
-                    <i class="fas fa-upload"></i> Importar
-                </button>
-                <input type="file" id="importFile" class="hidden" accept=".csv">
-                <button id="exportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-700 transition-colors flex items-center gap-2">
-                    <i class="fas fa-download"></i> Exportar / Modelo CSV
-                </button>
-            </div>
-            <button id="clearAllBtn" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-red-600 transition-colors flex items-center gap-2">
-                <i class="fas fa-trash"></i> Limpar Painel Atual
-            </button>
-        </div>
-
-        <main id="kanban-board" class="flex gap-6 overflow-x-auto pb-4">
-            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 min-w-[20rem] sm:w-96 sm:min-w-[24rem] flex-shrink-0" data-column-id="todo">
-                <h3 class="font-bold text-lg mb-4 text-orange-600 flex items-center gap-2"><i class="fas fa-list-check"></i>A Fazer</h3>
-                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="todo-list"></div>
-            </div>
-            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 min-w-[20rem] sm:w-96 sm:min-w-[24rem] flex-shrink-0" data-column-id="doing">
-                <h3 class="font-bold text-lg mb-4 text-blue-600 flex items-center gap-2"><i class="fas fa-person-digging"></i>Em Andamento</h3>
-                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="doing-list"></div>
-            </div>
-            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 min-w-[20rem] sm:w-96 sm:min-w-[24rem] flex-shrink-0" data-column-id="done">
-                <h3 class="font-bold text-lg mb-4 text-green-600 flex items-center gap-2"><i class="fas fa-check-double"></i>Concluído</h3>
-                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="done-list"></div>
-            </div>
-        </main>
-        
-        <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md p-2 min-h-[400px]"></div>
+    <div class="flex gap-2 mb-6">
+        <button id="addTaskBtn" class="bg-blue-600 text-white px-4 py-2 rounded">+ Tarefa</button>
+        <button id="generateSummaryBtn" class="bg-purple-600 text-white px-4 py-2 rounded">✨ Resumo</button>
+        <button id="clearAllBtn" class="bg-red-500 text-white px-4 py-2 rounded">🗑 Limpar</button>
     </div>
 
-    <!-- Modal Adicionar/Editar -->
-    <div id="taskModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-lg m-4 max-h-[90vh] overflow-y-auto">
-            <h2 id="modalTitle" class="text-2xl font-bold mb-6 text-gray-800">Nova Tarefa</h2>
-            <form id="taskForm">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-1">Tarefa</label>
-                        <input type="text" id="taskTarefa" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" required>
-                    </div>
-                     <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-1">Solicitante</label>
-                        <input type="text" id="taskSolicitante" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-1">Data da Solicitação</label>
-                        <input type="date" id="taskDataSolicitacao" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-gray-700 font-medium mb-1">Data de Agendamento</label>
-                        <input type="date" id="taskDataAgendamento" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    </div>
-                     <div class="mb-4 col-span-1 md:col-span-2">
-                        <label class="block text-gray-700 font-medium mb-1">Data da Entrega</label>
-                        <input type="date" id="taskDataEntrega" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    </div>
-                    <div class="mb-4 col-span-1 md:col-span-2">
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="block text-gray-700 font-medium">Observações</label>
-                            <button type="button" id="generateAIBtn" class="text-xs bg-purple-100 text-purple-700 font-semibold py-1 px-2 rounded-full hover:bg-purple-200 transition-colors flex items-center gap-1">
-                                ✨ Gerar com IA
-                            </button>
-                        </div>
-                        <div id="taskObservacoes" contenteditable="true" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 min-h-[100px] overflow-y-auto bg-white focus:outline-none"></div>
-                    </div>
-                    <div class="mb-4 col-span-1 md:col-span-2 border-t pt-4">
-                        <label class="block text-gray-700 font-medium mb-1">Checklist de Ações</label>
-                        <div id="checklist-container" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-1"></div>
-                        <div class="flex gap-2">
-                            <input type="text" id="checklistItemInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Adicionar ação...">
-                            <button type="button" id="addChecklistItemBtn" class="bg-blue-100 text-blue-600 py-2 px-3 rounded-lg hover:bg-blue-200 transition-colors"><i class="fas fa-plus"></i></button>
-                        </div>
-                    </div>
-                </div>
-                <input type="hidden" id="taskId">
-                <div class="flex justify-end gap-4 mt-6">
-                    <button type="button" id="cancelBtn" class="bg-gray-100 text-gray-600 font-bold py-2 px-6 rounded-lg hover:bg-gray-200">Cancelar</button>
-                    <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 shadow-md">Salvar Tarefa</button>
-                </div>
-            </form>
+    <div id="kanban-board" class="flex gap-4">
+        <div class="task-column w-80 bg-gray-100 p-4 rounded" data-column-id="todo">
+            <h3 class="font-bold mb-2 text-orange-600">A Fazer</h3>
+            <div id="todo-list" class="space-y-2 min-h-[200px]"></div>
+        </div>
+
+        <div class="task-column w-80 bg-gray-100 p-4 rounded" data-column-id="doing">
+            <h3 class="font-bold mb-2 text-blue-600">Em Andamento</h3>
+            <div id="doing-list" class="space-y-2 min-h-[200px]"></div>
+        </div>
+
+        <div class="task-column w-80 bg-gray-100 p-4 rounded" data-column-id="done">
+            <h3 class="font-bold mb-2 text-green-600">Concluído</h3>
+            <div id="done-list" class="space-y-2 min-h-[200px]"></div>
         </div>
     </div>
+</div>
 
-    <!-- Modal IA -->
-    <div id="summaryModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-2xl m-4 max-h-[80vh] flex flex-col">
-            <div class="flex justify-between items-center mb-4 pb-4 border-b">
-                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">✨ Resumo de Produtividade</h2>
-                <button id="closeSummaryBtn" class="text-2xl text-gray-400 hover:text-gray-800">&times;</button>
+<!-- MODAL -->
+<div id="taskModal" class="fixed inset-0 hidden items-center justify-center bg-black/50 z-50">
+    <div class="bg-white p-6 rounded w-full max-w-md">
+        <h2 id="modalTitle" class="text-xl font-bold mb-4">Nova Tarefa</h2>
+        <form id="taskForm">
+            <input id="taskTarefa" required placeholder="Título" class="w-full border p-2 mb-3">
+            <input type="hidden" id="taskId">
+            <div class="flex justify-end gap-2">
+                <button type="button" id="cancelBtn">Cancelar</button>
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Salvar</button>
             </div>
-            <div id="summaryContent" class="overflow-y-auto text-gray-700 space-y-4 pr-2"></div>
-        </div>
+        </form>
     </div>
+</div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+<script type="module">
+console.log("JS carregado");
 
-        // Configurações
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-board-prod';
-        const apiKey = ""; // Chave fornecida pelo ambiente
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Estado Global
-        let allTasks = [];
-        let currentBoardId = 'geral';
-        const boards = [
-            { id: 'consolidado', name: 'Consolidado' },
-            { id: 'geral', name: 'Tarefas no Geral' },
-            { id: 'planejamento', name: 'Planejamento Estratégico' },
-            { id: 'plano-acao', name: 'Plano de Ação' },
-            { id: 'entregas-internas', name: 'Entregas Internas' }
-        ];
-
-        // --- Funções Auxiliares ---
-        const showMsg = (txt, color='bg-blue-600') => {
-            const m = document.getElementById('custom-message');
-            m.textContent = txt;
-            m.className = `${color} fixed top-5 right-5 p-4 rounded text-white shadow-lg z-[3000]`;
-            m.style.display = 'block';
-            setTimeout(() => { m.style.display = 'none'; }, 3000);
+/* 🔐 FIREBASE CONFIG (COMPATÍVEL COM GITHUB) */
+const firebaseConfig =
+    typeof __firebase_config !== "undefined"
+        ? JSON.parse(__firebase_config)
+        : {
+            apiKey: "SUA_API_KEY",
+            authDomain: "SEU_PROJETO.firebaseapp.com",
+            projectId: "SEU_PROJETO",
+            storageBucket: "SEU_PROJETO.appspot.com",
+            messagingSenderId: "XXXXXXX",
+            appId: "SEU_APP_ID"
         };
 
-        const formatDate = (d) => d ? new Date(d + "T12:00:00").toLocaleDateString('pt-BR') : '';
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-        // --- Lógica de Renderização ---
-        const updateDash = () => {
-            document.getElementById('total-tasks').textContent = allTasks.length;
-            document.getElementById('todo-tasks').textContent = allTasks.filter(t => t.status === 'todo').length;
-            document.getElementById('doing-tasks').textContent = allTasks.filter(t => t.status === 'doing').length;
-            document.getElementById('done-tasks').textContent = allTasks.filter(t => t.status === 'done').length;
+const appId =
+    typeof __app_id !== "undefined"
+        ? __app_id
+        : "github-kanban-board";
+
+let allTasks = [];
+
+/* UTIL */
+const showMsg = (t) => alert(t);
+
+/* CARD */
+function createCard(task) {
+    const d = document.createElement("div");
+    d.className = "task-card bg-white p-3 rounded shadow";
+    d.draggable = true;
+    d.innerHTML = `
+        <div class="flex justify-between items-center">
+            <strong>${task.tarefa}</strong>
+            <button class="text-red-500"><i class="fas fa-trash"></i></button>
+        </div>
+    `;
+    d.querySelector("button").onclick = () =>
+        deleteDoc(doc(db,"artifacts",appId,"public","data","tasks",task.id));
+    d.ondragstart = e => e.dataTransfer.setData("id",task.id);
+    return d;
+}
+
+/* RENDER */
+function render() {
+    ["todo","doing","done"].forEach(s =>
+        document.getElementById(`${s}-list`).innerHTML=""
+    );
+
+    allTasks.forEach(t =>
+        document.getElementById(`${t.status}-list`)
+            .appendChild(createCard(t))
+    );
+}
+
+/* EVENTS */
+function setupEvents() {
+    addTaskBtn.onclick = () => {
+        taskForm.reset();
+        taskId.value = "task-" + Date.now();
+        taskModal.classList.remove("hidden");
+        taskModal.classList.add("flex");
+    };
+
+    cancelBtn.onclick = () => taskModal.classList.add("hidden");
+
+    taskForm.onsubmit = async e => {
+        e.preventDefault();
+        const data = {
+            id: taskId.value,
+            tarefa: taskTarefa.value,
+            status: "todo"
         };
+        await setDoc(doc(db,"artifacts",appId,"public","data","tasks",data.id),data);
+        taskModal.classList.add("hidden");
+        showMsg("Tarefa salva");
+    };
 
-        const renderTabs = () => {
-            const container = document.getElementById('tabs-container');
-            container.innerHTML = '';
-            boards.forEach(b => {
-                const btn = document.createElement('button');
-                btn.className = `tab-btn flex-1 text-gray-600 py-3 px-4 border-b-2 border-transparent text-sm md:text-base whitespace-nowrap ${currentBoardId === b.id ? 'active' : ''}`;
-                btn.textContent = b.name;
-                btn.onclick = () => { 
-                    currentBoardId = b.id; 
-                    renderTabs(); 
-                    renderBoard(); 
-                };
-                container.appendChild(btn);
-            });
-        };
-
-        const renderBoard = () => {
-            document.getElementById('board-title').textContent = boards.find(b => b.id === currentBoardId).name;
-            const isConsol = currentBoardId === 'consolidado';
-            
-            document.getElementById('kanban-board').style.display = isConsol ? 'none' : 'flex';
-            document.getElementById('consolidated-view').style.display = isConsol ? 'block' : 'none';
-            
-            // Mostrar/Ocultar botões baseado na aba
-            document.getElementById('addTaskBtn').style.display = isConsol ? 'none' : 'flex';
-            document.getElementById('importBtn').style.display = isConsol ? 'none' : 'flex';
-            document.getElementById('exportBtn').style.display = isConsol ? 'none' : 'flex';
-            document.getElementById('clearAllBtn').style.display = isConsol ? 'none' : 'flex';
-
-            if (isConsol) {
-                renderTable();
-            } else {
-                const cols = {
-                    todo: document.getElementById('todo-list'),
-                    doing: document.getElementById('doing-list'),
-                    done: document.getElementById('done-list')
-                };
-                Object.values(cols).forEach(c => c.innerHTML = '');
-                allTasks.filter(t => t.boardId === currentBoardId).forEach(t => {
-                    cols[t.status]?.appendChild(createCard(t));
-                });
+    document.querySelectorAll(".task-column").forEach(col=>{
+        col.ondragover = e => e.preventDefault();
+        col.ondrop = async e => {
+            const id = e.dataTransfer.getData("id");
+            const t = allTasks.find(x=>x.id===id);
+            if(t){
+                t.status = col.dataset.columnId;
+                await setDoc(doc(db,"artifacts",appId,"public","data","tasks",id),t);
             }
         };
+    });
+}
 
-        const createCard = (task) => {
-            const div = document.createElement('div');
-            div.className = 'task-card bg-white p-3 rounded-md shadow-sm border border-gray-200 relative mb-4';
-            div.id = task.id;
-            div.draggable = true;
-
-            div.innerHTML = `
-                <div class="card-controls absolute top-2 right-2 flex gap-2">
-                    <button class="dup-btn text-gray-300 hover:text-green-500" title="Duplicar"><i class="fas fa-clone fa-xs"></i></button>
-                    <button class="edit-btn text-gray-300 hover:text-blue-500" title="Editar"><i class="fas fa-pencil fa-xs"></i></button>
-                    <button class="del-btn text-gray-300 hover:text-red-500" title="Excluir"><i class="fas fa-trash fa-xs"></i></button>
-                </div>
-                <h4 class="font-bold text-gray-800 text-sm pr-12 text-left">${task.tarefa}</h4>
-                ${task.solicitante ? `<div class="task-detail mt-1 text-left"><i class="fas fa-user text-[10px]"></i><span class="text-xs">${task.solicitante}</span></div>` : ''}
-                <div class="mt-2 space-y-0.5 border-t pt-2 text-left">
-                    ${task.dataAgendamento ? `<div class="task-detail"><i class="fas fa-calendar-day text-[10px]"></i><span class="text-[10px]">Agendado: ${formatDate(task.dataAgendamento)}</span></div>` : ''}
-                    ${task.dataEntrega ? `<div class="task-detail"><i class="fas fa-check-circle text-[10px] text-green-500"></i><span class="text-[10px] font-bold text-green-600">Entregue: ${formatDate(task.dataEntrega)}</span></div>` : ''}
-                </div>
-                ${task.observacoes ? `<div class="task-observations text-[10px] text-gray-500 mt-2 line-clamp-3 overflow-hidden text-left">${task.observacoes}</div>` : ''}
-            `;
-
-            div.querySelector('.del-btn').onclick = (e) => { 
-                e.stopPropagation();
-                if(confirm("Deseja mesmo excluir esta tarefa?")) deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id)); 
-            };
-            div.querySelector('.edit-btn').onclick = (e) => { e.stopPropagation(); openModal(task); };
-            div.querySelector('.dup-btn').onclick = (e) => { 
-                e.stopPropagation();
-                openModal({...task, id: 'task-'+Date.now()}, true); 
-            };
-            div.ondragstart = (e) => e.dataTransfer.setData('text', task.id);
-
-            return div;
-        };
-
-        const renderTable = () => {
-            const container = document.getElementById('consolidated-view');
-            container.innerHTML = `
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm border-collapse min-w-[600px]">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="p-3 border">Solicitante</th>
-                                <th class="p-3 border">Tarefa</th>
-                                <th class="p-3 border">Prazo</th>
-                                <th class="p-3 border">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>${allTasks.map(t => {
-                            const stMap = {todo:'A Fazer', doing:'Em Andamento', done:'Concluído'};
-                            const stCol = {todo:'bg-orange-100 text-orange-700', doing:'bg-blue-100 text-blue-700', done:'bg-green-100 text-green-700'};
-                            return `<tr>
-                                <td class="p-3 border">${t.solicitante || '-'}</td>
-                                <td class="p-3 border font-medium">${t.tarefa}</td>
-                                <td class="p-3 border">${t.dataAgendamento || '-'}</td>
-                                <td class="p-3 border"><span class="px-2 py-1 rounded-full text-[10px] font-bold ${stCol[t.status]}">${stMap[t.status]}</span></td>
-                            </tr>`;
-                        }).join('')}</tbody>
-                    </table>
-                </div>`;
-        };
-
-        // --- Modais ---
-        const openModal = (t = null, isDup = false) => {
-            const form = document.getElementById('taskForm');
-            form.reset();
-            document.getElementById('taskObservacoes').innerHTML = '';
-            document.getElementById('checklist-container').innerHTML = '';
-            
-            if (t) {
-                document.getElementById('taskId').value = isDup ? 'task-'+Date.now() : t.id;
-                document.getElementById('taskTarefa').value = t.tarefa;
-                document.getElementById('taskSolicitante').value = t.solicitante || '';
-                document.getElementById('taskDataSolicitacao').value = t.dataSolicitacao || '';
-                document.getElementById('taskDataAgendamento').value = t.dataAgendamento || '';
-                document.getElementById('taskDataEntrega').value = t.dataEntrega || '';
-                document.getElementById('taskObservacoes').innerHTML = t.observacoes || '';
-                if(t.checklist) {
-                    try {
-                        JSON.parse(t.checklist).forEach(i => addItem(i.text, i.checked));
-                    } catch(e) {}
+/* INIT */
+document.addEventListener("DOMContentLoaded", async () => {
+    setupEvents();
+    await signInAnonymously(auth);
+    onAuthStateChanged(auth, user => {
+        if(user){
+            onSnapshot(
+                collection(db,"artifacts",appId,"public","data","tasks"),
+                snap=>{
+                    allTasks = snap.docs.map(d=>({id:d.id,...d.data()}));
+                    render();
                 }
-                document.getElementById('modalTitle').textContent = isDup ? 'Duplicar Tarefa' : 'Editar Tarefa';
-            } else {
-                document.getElementById('taskId').value = 'task-'+Date.now();
-                document.getElementById('modalTitle').textContent = 'Nova Tarefa';
-            }
-            
-            document.getElementById('taskModal').classList.remove('hidden');
-            document.getElementById('taskModal').classList.add('flex');
-        };
-
-        const addItem = (txt, chk = false) => {
-            const container = document.getElementById('checklist-container');
-            const d = document.createElement('div');
-            d.className = 'flex items-center gap-2 bg-gray-50 p-2 mb-2 rounded';
-            d.innerHTML = `
-                <input type="checkbox" ${chk?'checked':''} class="h-4 w-4">
-                <input type="text" value="${txt}" class="flex-grow bg-transparent text-sm focus:outline-none">
-                <button type="button" class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>
-            `;
-            d.querySelector('button').onclick = () => d.remove();
-            container.appendChild(d);
-        };
-
-        // --- Atribuição de Eventos ---
-        const setupEvents = () => {
-            document.getElementById('addTaskBtn').addEventListener('click', () => openModal());
-            document.getElementById('cancelBtn').addEventListener('click', () => document.getElementById('taskModal').classList.add('hidden'));
-            
-            document.getElementById('addChecklistItemBtn').addEventListener('click', () => {
-                const input = document.getElementById('checklistItemInput');
-                if(input.value.trim()) { addItem(input.value.trim()); input.value=''; }
-            });
-
-            document.getElementById('taskForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const id = document.getElementById('taskId').value;
-                const entrega = document.getElementById('taskDataEntrega').value;
-                const checklist = [];
-                document.getElementById('checklist-container').querySelectorAll('div.flex').forEach(item => {
-                    const text = item.querySelector('input[type="text"]').value;
-                    if(text) checklist.push({ text, checked: item.querySelector('input[type="checkbox"]').checked });
-                });
-
-                const existing = allTasks.find(x => x.id === id);
-                let st = existing ? existing.status : 'todo';
-                if (entrega) st = 'done';
-
-                const data = {
-                    id, 
-                    boardId: currentBoardId, 
-                    status: st,
-                    tarefa: document.getElementById('taskTarefa').value,
-                    solicitante: document.getElementById('taskSolicitante').value,
-                    dataSolicitacao: document.getElementById('taskDataSolicitacao').value,
-                    dataAgendamento: document.getElementById('taskDataAgendamento').value,
-                    dataEntrega: entrega,
-                    observacoes: document.getElementById('taskObservacoes').innerHTML,
-                    checklist: JSON.stringify(checklist)
-                };
-                
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', id), data);
-                document.getElementById('taskModal').classList.add('hidden');
-                showMsg("Sucesso: Tarefa salva!");
-            });
-
-            // IA
-            document.getElementById('generateAIBtn').addEventListener('click', async () => {
-                const title = document.getElementById('taskTarefa').value;
-                if(!title) return alert("Dê um título à tarefa primeiro.");
-                const btn = document.getElementById('generateAIBtn');
-                const original = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                try {
-                    const resp = await fetch(geminiUrl, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: `Gere 5 subtarefas para: "${title}"` }] }], systemInstruction: { parts: [{ text: "Retorne apenas lista simples, sem números." }] } }) });
-                    const res = await resp.json();
-                    res.candidates[0].content.parts[0].text.split('\n').forEach(l => { if(l.trim()) addItem(l.trim().replace(/^[\d.-]\s*/, '')); });
-                } catch(e) { showMsg("IA falhou", "bg-red-500"); }
-                btn.innerHTML = original;
-            });
-
-            document.getElementById('generateSummaryBtn').addEventListener('click', async () => {
-                const modal = document.getElementById('summaryModal');
-                const content = document.getElementById('summaryContent');
-                modal.classList.remove('hidden');
-                modal.classList.add('flex');
-                content.innerHTML = '<p class="text-center p-8">IA analisando dados...</p>';
-                try {
-                    const resp = await fetch(geminiUrl, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: `Analise motivacionalmente: ${allTasks.map(t=>t.tarefa).join(', ')}` }] }], systemInstruction: { parts: [{ text: "Responda em Português HTML simples." }] } }) });
-                    const res = await resp.json();
-                    content.innerHTML = res.candidates[0].content.parts[0].text;
-                } catch(e) { content.innerHTML = "Erro ao conectar com IA."; }
-            });
-
-            document.getElementById('closeSummaryBtn').addEventListener('click', () => document.getElementById('summaryModal').classList.add('hidden'));
-
-            // CSV
-            document.getElementById('exportBtn').addEventListener('click', () => {
-                const h = "boardId;status;id;tarefa;solicitante;dataSolicitacao;dataAgendamento;dataEntrega;observacoes_b64;checklist_b64";
-                const rows = allTasks.map(t => [t.boardId, t.status, t.id, `"${t.tarefa}"`, `"${t.solicitante||''}"`, t.dataSolicitacao||'', t.dataAgendamento||'', t.dataEntrega||'', btoa(unescape(encodeURIComponent(t.observacoes||''))), btoa(unescape(encodeURIComponent(t.checklist||'')))].join(';'));
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob(["\uFEFFsep=;\n" + h + "\n" + rows.join("\n")], { type: 'text/csv;charset=utf-8;' }));
-                a.download = "backup_tarefas.csv"; a.click();
-            });
-
-            document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
-            document.getElementById('importFile').addEventListener('change', async (e) => {
-                const f = e.target.files[0]; if(!f) return;
-                const reader = new FileReader();
-                reader.onload = async (ev) => {
-                    const lines = ev.target.result.split('\n').filter(l => l.trim() && !l.startsWith('sep='));
-                    const headers = lines[0].split(';');
-                    for (let i = 1; i < lines.length; i++) {
-                        const vals = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                        const data = {};
-                        headers.forEach((h, idx) => {
-                            let v = (vals[idx] || '').trim();
-                            if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1).replace(/""/g, '"');
-                            data[h.trim()] = v;
-                        });
-                        try {
-                            if(data.observacoes_b64) data.observacoes = decodeURIComponent(escape(atob(data.observacoes_b64)));
-                            if(data.checklist_b64) data.checklist = decodeURIComponent(escape(atob(data.checklist_b64)));
-                            delete data.observacoes_b64; delete data.checklist_b64;
-                        } catch(ex) {}
-                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', data.id), data);
-                    }
-                    showMsg("Importação concluída!", "bg-teal-600");
-                };
-                reader.readAsText(f);
-            });
-
-            document.getElementById('clearAllBtn').addEventListener('click', () => {
-                if (confirm("Apagar todas as tarefas deste painel?")) {
-                    allTasks.filter(t => t.boardId === currentBoardId).forEach(t => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id)));
-                }
-            });
-
-            // Drag and Drop
-            document.querySelectorAll('.task-column').forEach(col => {
-                col.ondragover = (e) => { e.preventDefault(); col.classList.add('drag-over'); };
-                col.ondragleave = () => col.classList.remove('drag-over');
-                col.ondrop = async (e) => {
-                    e.preventDefault();
-                    col.classList.remove('drag-over');
-                    const id = e.dataTransfer.getData('text');
-                    const task = allTasks.find(t => t.id === id);
-                    if (task && task.status !== col.dataset.columnId) {
-                        const up = { ...task, status: col.dataset.columnId };
-                        if (up.status === 'done' && !up.dataEntrega) up.dataEntrega = new Date().toISOString().split('T')[0];
-                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', id), up);
-                    }
-                };
-            });
-
-            // Paste Image
-            document.getElementById('taskObservacoes').onpaste = (e) => {
-                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-                for (const item of items) {
-                    if (item.type.indexOf('image') === 0) {
-                        const reader = new FileReader();
-                        reader.onload = (ev) => { 
-                            const img = document.createElement('img'); 
-                            img.src = ev.target.result; 
-                            document.getElementById('taskObservacoes').appendChild(img); 
-                        };
-                        reader.readAsDataURL(item.getAsFile());
-                    }
-                }
-            };
-        };
-
-        // --- Inicialização ---
-        const start = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (e) { console.error("Auth Erro", e); }
-        };
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                const ref = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
-                onSnapshot(ref, (snap) => {
-                    allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    renderBoard();
-                    updateDash();
-                });
-            }
-        });
-
-        // Configurar botões imediatamente
-        setupEvents();
-        renderTabs();
-        await start();
-    </script>
+            );
+        }
+    });
+});
+</script>
 </body>
 </html>
