@@ -3,184 +3,759 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Tarefas Interativo - Firebase</title>
+    <title>Painel de Tarefas Interativo - Cloud Sync</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
-        .task-card { cursor: grab; transition: all 0.2s; }
-        .task-card:active { cursor: grabbing; transform: scale(1.02); }
-        .task-list { min-height: 150px; }
-        .task-column.drag-over { border: 2px dashed #3b82f6; background-color: #eff6ff; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+        }
+        .task-card {
+            cursor: grab;
+            transition: all 0.2s ease-in-out;
+        }
+        .task-card .card-controls {
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+        .task-card:hover .card-controls {
+            opacity: 1;
+        }
+        .task-card .checklist-details {
+            display: none;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .task-card:hover .checklist-details {
+            display: block;
+            max-height: 200px;
+        }
+        .task-card.no-drag {
+            cursor: default;
+        }
+        .task-card:active {
+            cursor: grabbing;
+            transform: scale(1.02);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .task-column.drag-over {
+            border-style: dashed;
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .task-list::-webkit-scrollbar,
+        #kanban-board::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .task-list::-webkit-scrollbar-track,
+        #kanban-board::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        .task-list::-webkit-scrollbar-thumb,
+        #kanban-board::-webkit-scrollbar-thumb {
+            background-color: #94a3b8;
+            border-radius: 10px;
+        }
+        .tab-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .tab-btn.active {
+            background-color: #ffffff;
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+            font-weight: 600;
+        }
+        .task-detail {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: #4a5568;
+        }
+        .task-detail i {
+            width: 14px;
+            text-align: center;
+        }
+        .task-observations img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.25rem;
+            margin-top: 0.5rem;
+        }
+        #taskObservacoes img {
+            max-width: 90%;
+            height: auto;
+            display: block;
+            margin: 0.5rem auto;
+            border-radius: 0.25rem;
+        }
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
+    <div id="loading-overlay">
+        <i class="fas fa-spinner fa-spin text-4xl text-blue-600"></i>
+        <p class="mt-4 font-semibold text-gray-700">Conectando ao Firebase...</p>
+    </div>
+
     <div class="max-w-7xl mx-auto">
-        <header class="mb-6 text-center md:text-left">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Painel de Tarefas</h1>
-            <p class="text-gray-500 mt-1">Sincronizado via Firebase Firestore</p>
+        <header class="mb-6">
+            <h1 id="board-title" class="text-3xl md:text-4xl font-bold text-gray-800 text-center md:text-left">Painel de Tarefas</h1>
+            <p class="text-gray-500 mt-1 text-center md:text-left">Organização em nuvem sincronizada em tempo real.</p>
         </header>
 
-        <section class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-                <h2 class="text-sm font-medium text-gray-500">Total</h2>
-                <p id="total-tasks" class="text-2xl font-bold">0</p>
+        <nav id="tabs-container" class="flex border-b border-gray-300 mb-6 bg-gray-200 rounded-t-lg p-1 overflow-x-auto">
+            <!-- Tabs will be dynamically inserted here -->
+        </nav>
+
+        <section id="productivity-dashboard" class="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-gray-500">
+                <h2 class="text-sm font-medium text-gray-500">Total de Tarefas</h2>
+                <p id="total-tasks" class="text-3xl font-bold text-gray-800">0</p>
             </div>
-            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-orange-500">
                 <h2 class="text-sm font-medium text-gray-500">A Fazer</h2>
-                <p id="todo-count" class="text-2xl font-bold text-orange-500">0</p>
+                <p id="todo-tasks" class="text-3xl font-bold text-orange-500">0</p>
             </div>
-            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-400">
-                <h2 class="text-sm font-medium text-gray-500">Fazendo</h2>
-                <p id="doing-count" class="text-2xl font-bold text-blue-500">0</p>
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+                <h2 class="text-sm font-medium text-gray-500">Em Andamento</h2>
+                <p id="doing-tasks" class="text-3xl font-bold text-blue-500">0</p>
             </div>
-            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
-                <h2 class="text-sm font-medium text-gray-500">Concluído</h2>
-                <p id="done-count" class="text-2xl font-bold text-green-500">0</p>
+            <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500">
+                <h2 class="text-sm font-medium text-gray-500">Concluídas</h2>
+                <p id="done-tasks" class="text-3xl font-bold text-green-500">0</p>
             </div>
         </section>
 
-        <div class="mb-6 flex flex-wrap gap-2">
-            <button onclick="openModal()" class="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
-                <i class="fas fa-plus mr-2"></i>Nova Tarefa
+        <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
+             <div class="flex flex-wrap gap-2">
+                <button id="addTaskBtn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-colors flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Adicionar Tarefa
+                </button>
+                <button id="generateSummaryBtn" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-purple-700 transition-colors flex items-center gap-2">
+                    ✨ Gerar Resumo
+                </button>
+                <button id="importBtn" class="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-teal-700 transition-colors flex items-center gap-2">
+                    <i class="fas fa-upload"></i> Importar
+                </button>
+                <input type="file" id="importFile" class="hidden" accept=".csv">
+                <button id="exportBtn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-700 transition-colors flex items-center gap-2">
+                    <i class="fas fa-download"></i> Exportar / Modelo CSV
+                </button>
+            </div>
+            <button id="clearAllBtn" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-red-600 transition-colors flex items-center gap-2">
+                <i class="fas fa-trash"></i> Limpar Painel Atual
             </button>
         </div>
 
         <main id="kanban-board" class="flex gap-6 overflow-x-auto pb-4">
-            <div class="task-column bg-gray-200 rounded-lg p-4 w-80 flex-shrink-0" data-status="todo">
-                <h3 class="font-bold mb-4 text-orange-700 uppercase text-sm tracking-wider">A Fazer</h3>
-                <div id="todo-list" class="task-list space-y-3"></div>
+            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 min-w-[20rem] sm:w-96 sm:min-w-[24rem] flex-shrink-0" data-column-id="todo">
+                <h3 class="font-bold text-lg mb-4 text-orange-600 flex items-center gap-2"><i class="fas fa-list-check"></i>A Fazer</h3>
+                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="todo-list"></div>
             </div>
-            <div class="task-column bg-gray-200 rounded-lg p-4 w-80 flex-shrink-0" data-status="doing">
-                <h3 class="font-bold mb-4 text-blue-700 uppercase text-sm tracking-wider">Em Andamento</h3>
-                <div id="doing-list" class="task-list space-y-3"></div>
+            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 min-w-[20rem] sm:w-96 sm:min-w-[24rem] flex-shrink-0" data-column-id="doing">
+                <h3 class="font-bold text-lg mb-4 text-blue-600 flex items-center gap-2"><i class="fas fa-person-digging"></i>Em Andamento</h3>
+                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="doing-list"></div>
             </div>
-            <div class="task-column bg-gray-200 rounded-lg p-4 w-80 flex-shrink-0" data-status="done">
-                <h3 class="font-bold mb-4 text-green-700 uppercase text-sm tracking-wider">Concluído</h3>
-                <div id="done-list" class="task-list space-y-3"></div>
+            <div class="task-column bg-gray-100 rounded-lg p-4 shadow-inner w-80 min-w-[20rem] sm:w-96 sm:min-w-[24rem] flex-shrink-0" data-column-id="done">
+                <h3 class="font-bold text-lg mb-4 text-green-600 flex items-center gap-2"><i class="fas fa-check-double"></i>Concluído</h3>
+                <div class="task-list space-y-4 min-h-[200px] max-h-[60vh] overflow-y-auto pr-2" id="done-list"></div>
             </div>
         </main>
+        
+        <div id="consolidated-view" class="hidden bg-white rounded-lg shadow-md p-2">
+            <!-- Table will be injected here by JS -->
+        </div>
     </div>
 
+    <!-- Modal Adicionar/Editar -->
     <div id="taskModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg w-full max-w-md shadow-2xl">
-            <h2 class="text-xl font-bold mb-4">Nova Tarefa</h2>
-            <form id="taskForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium">Título da Tarefa</label>
-                    <input type="text" id="taskTitle" class="w-full p-2 border rounded" required>
+        <div class="bg-white p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-lg m-4 max-h-[90vh] overflow-y-auto">
+            <h2 id="modalTitle" class="text-2xl font-bold mb-6">Nova Tarefa</h2>
+            <form id="taskForm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-medium mb-1">Tarefa</label>
+                        <input type="text" id="taskTarefa" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                     <div class="mb-4">
+                        <label class="block text-gray-700 font-medium mb-1">Solicitante</label>
+                        <input type="text" id="taskSolicitante" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-medium mb-1">Data da Solicitação</label>
+                        <input type="date" id="taskDataSolicitacao" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-medium mb-1">Data de Agendamento</label>
+                        <input type="date" id="taskDataAgendamento" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                    </div>
+                     <div class="mb-4 col-span-1 md:col-span-2">
+                        <label class="block text-gray-700 font-medium mb-1">Data da Entrega</label>
+                        <input type="date" id="taskDataEntrega" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="mb-4 col-span-1 md:col-span-2">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-gray-700 font-medium">Observações</label>
+                            <button type="button" id="generateAIBtn" class="text-xs bg-purple-100 text-purple-700 font-semibold py-1 px-2 rounded-full hover:bg-purple-200 transition-colors flex items-center gap-1">
+                                ✨ Gerar com IA
+                            </button>
+                        </div>
+                        <div id="taskObservacoes" contenteditable="true" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 min-h-[100px] overflow-y-auto bg-white"></div>
+                        <p class="text-[10px] text-gray-400 mt-1">Dica: você pode colar imagens aqui.</p>
+                    </div>
+                    <div class="mb-4 col-span-1 md:col-span-2 border-t pt-4">
+                        <label class="block text-gray-700 font-medium mb-1">Checklist de Ações</label>
+                        <div id="checklist-container" class="space-y-2 mb-2 max-h-40 overflow-y-auto p-1"></div>
+                        <div class="flex gap-2">
+                            <input type="text" id="checklistItemInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Nova ação...">
+                            <button type="button" id="addChecklistItemBtn" class="bg-blue-100 text-blue-600 py-2 px-3 rounded-lg hover:bg-blue-200"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium">Solicitante</label>
-                    <input type="text" id="taskRequester" class="w-full p-2 border rounded">
-                </div>
-                <div class="flex justify-end gap-2 pt-4">
-                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-600">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Salvar</button>
+                <input type="hidden" id="taskId">
+                <div class="flex justify-end gap-4 mt-6">
+                    <button type="button" id="cancelBtn" class="bg-gray-100 text-gray-600 font-bold py-2 px-6 rounded-lg hover:bg-gray-200">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 shadow-md">Salvar Tarefa</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Modal Resumo IA -->
+    <div id="summaryModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-2xl m-4 max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-4 border-b">
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">✨ Resumo de Produtividade</h2>
+                <button id="closeSummaryBtn" class="text-2xl text-gray-400 hover:text-gray-800">&times;</button>
+            </div>
+            <div id="summaryContent" class="overflow-y-auto text-gray-700 space-y-4 pr-2"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, updateDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, signInAnonymously, query, getAuth } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // CONFIGURAÇÃO DO FIREBASE (COLE AQUI O SEU DO CONSOLE)
-        const firebaseConfig = {
-            apiKey: "SUA_API_KEY",
-            authDomain: "SEU_PROJETO.firebaseapp.com",
-            projectId: "SEU_PROJETO_ID",
-            storageBucket: "SEU_PROJETO.appspot.com",
-            messagingSenderId: "ID",
-            appId: "ID_DO_APP"
-        };
-
+        // Firebase Configuration (Global variables provided by environment)
+        const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const tasksCol = collection(db, "tasks");
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'task-board-app';
 
-        // FUNÇÕES DE UI
-        window.openModal = () => document.getElementById('taskModal').classList.remove('hidden');
-        window.closeModal = () => document.getElementById('taskModal').classList.add('hidden');
+        // Gemini API Configuration
+        const GEMINI_API_KEY = "";
+        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
 
-        // SALVAR TAREFA
-        document.getElementById('taskForm').addEventListener('submit', async (e) => {
+        // App State
+        let allTasksFromDB = [];
+        let currentBoardId = 'geral';
+        const boards = [
+            { id: 'consolidado', name: 'Consolidado' },
+            { id: 'geral', name: 'Tarefas no Geral' },
+            { id: 'planejamento', name: 'Planejamento Estratégico' },
+            { id: 'plano-acao', name: 'Plano de Ação' },
+            { id: 'entregas-internas', name: 'Entregas Internas' }
+        ];
+
+        // DOM Elements
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const tabsContainer = document.getElementById('tabs-container');
+        const boardTitleEl = document.getElementById('board-title');
+        const addTaskBtn = document.getElementById('addTaskBtn');
+        const taskModal = document.getElementById('taskModal');
+        const taskForm = document.getElementById('taskForm');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const modalTitle = document.getElementById('modalTitle');
+        const generateAIBtn = document.getElementById('generateAIBtn');
+        const generateSummaryBtn = document.getElementById('generateSummaryBtn');
+        const summaryModal = document.getElementById('summaryModal');
+        const closeSummaryBtn = document.getElementById('closeSummaryBtn');
+        const summaryContent = document.getElementById('summaryContent');
+        const checklistContainer = document.getElementById('checklist-container');
+        const checklistItemInput = document.getElementById('checklistItemInput');
+        const addChecklistItemBtn = document.getElementById('addChecklistItemBtn');
+        const importBtn = document.getElementById('importBtn');
+        const importFile = document.getElementById('importFile');
+        const exportBtn = document.getElementById('exportBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        
+        const columnLists = {
+            todo: document.getElementById('todo-list'),
+            doing: document.getElementById('doing-list'),
+            done: document.getElementById('done-list')
+        };
+
+        // --- Firebase Core Logic ---
+
+        const initApp = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth failed:", error);
+                alert("Erro ao conectar com o servidor de dados.");
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loadingOverlay.classList.add('hidden');
+                setupRealtimeSync();
+            }
+        });
+
+        const setupRealtimeSync = () => {
+            const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'tasks');
+            onSnapshot(tasksRef, (snapshot) => {
+                allTasksFromDB = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderCurrentBoard();
+                updateDashboard();
+            }, (error) => {
+                console.error("Firestore sync error:", error);
+            });
+        };
+
+        // --- Data Actions ---
+
+        const saveTaskToFirebase = async (taskData) => {
+            const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskData.id);
+            await setDoc(taskRef, taskData);
+        };
+
+        const deleteTaskFromFirebase = async (taskId) => {
+            const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskId);
+            await deleteDoc(taskRef);
+        };
+
+        // --- Rendering ---
+
+        const renderTabs = () => {
+            tabsContainer.innerHTML = '';
+            boards.forEach(board => {
+                const btn = document.createElement('button');
+                btn.className = `tab-btn flex-1 text-gray-600 py-3 px-4 border-b-2 border-transparent text-sm md:text-base whitespace-nowrap ${currentBoardId === board.id ? 'active' : ''}`;
+                btn.textContent = board.name;
+                btn.onclick = () => {
+                    currentBoardId = board.id;
+                    renderTabs();
+                    renderCurrentBoard();
+                };
+                tabsContainer.appendChild(btn);
+            });
+        };
+
+        const renderCurrentBoard = () => {
+            boardTitleEl.textContent = boards.find(b => b.id === currentBoardId).name;
+            
+            const kanbanBoard = document.getElementById('kanban-board');
+            const consolidatedView = document.getElementById('consolidated-view');
+
+            const isConsolidated = currentBoardId === 'consolidado';
+            kanbanBoard.style.display = isConsolidated ? 'none' : 'flex';
+            consolidatedView.style.display = isConsolidated ? 'block' : 'none';
+            addTaskBtn.style.display = isConsolidated ? 'none' : 'flex';
+            importBtn.style.display = isConsolidated ? 'none' : 'flex';
+            exportBtn.style.display = isConsolidated ? 'none' : 'flex';
+            clearAllBtn.style.display = isConsolidated ? 'none' : 'flex';
+
+            if (isConsolidated) {
+                renderConsolidatedTable();
+            } else {
+                Object.keys(columnLists).forEach(id => columnLists[id].innerHTML = '');
+                const boardTasks = allTasksFromDB.filter(t => t.boardId === currentBoardId);
+                boardTasks.forEach(task => {
+                    const card = createTaskCard(task);
+                    if (columnLists[task.status]) {
+                        columnLists[task.status].appendChild(card);
+                    }
+                });
+            }
+        };
+
+        const createTaskCard = (task) => {
+            const card = document.createElement('div');
+            card.id = task.id;
+            card.draggable = true;
+            card.className = 'task-card bg-white p-3 rounded-md shadow-sm border border-gray-200 relative mb-4';
+            
+            const formatDate = (ds) => ds ? new Date(ds + "T12:00:00").toLocaleDateString('pt-BR') : '';
+            
+            let checklistSummary = '';
+            if (task.checklist) {
+                const items = JSON.parse(task.checklist);
+                if (items.length > 0) {
+                    const done = items.filter(i => i.checked).length;
+                    const progress = Math.round((done / items.length) * 100);
+                    checklistSummary = `
+                        <div class="mt-3 pt-2 border-t border-dashed">
+                            <div class="flex justify-between text-[10px] text-gray-500 mb-1"><span>Ações</span><span>${done}/${items.length}</span></div>
+                            <div class="w-full bg-gray-100 rounded-full h-1"><div class="bg-green-500 h-1 rounded-full" style="width:${progress}%"></div></div>
+                            <div class="checklist-details mt-2 space-y-1">
+                                ${items.map(i => `<div class="text-[10px] flex items-center gap-1 ${i.checked ? 'line-through text-gray-400' : 'text-gray-600'}"><i class="far ${i.checked ? 'fa-check-square' : 'fa-square'}"></i>${i.text}</div>`).join('')}
+                            </div>
+                        </div>`;
+                }
+            }
+
+            card.innerHTML = `
+                <div class="card-controls absolute top-2 right-2 flex gap-2">
+                    <button class="dup-btn text-gray-300 hover:text-green-500"><i class="fas fa-clone fa-xs"></i></button>
+                    <button class="edit-btn text-gray-300 hover:text-blue-500"><i class="fas fa-pencil fa-xs"></i></button>
+                    <button class="del-btn text-gray-300 hover:text-red-500"><i class="fas fa-trash fa-xs"></i></button>
+                </div>
+                <h4 class="font-bold text-gray-800 text-sm pr-12">${task.tarefa}</h4>
+                ${task.solicitante ? `<div class="task-detail mt-1"><i class="fas fa-user text-[10px]"></i><span class="text-xs">${task.solicitante}</span></div>` : ''}
+                <div class="mt-2 space-y-0.5 border-t pt-2">
+                    ${task.dataAgendamento ? `<div class="task-detail"><i class="fas fa-calendar-day text-[10px]"></i><span class="text-[10px]">Agendado: ${formatDate(task.dataAgendamento)}</span></div>` : ''}
+                    ${task.dataEntrega ? `<div class="task-detail"><i class="fas fa-check-circle text-[10px] text-green-500"></i><span class="text-[10px] font-bold text-green-600">Entregue: ${formatDate(task.dataEntrega)}</span></div>` : ''}
+                </div>
+                ${task.observacoes ? `<div class="task-observations text-[10px] text-gray-500 mt-2 line-clamp-2 overflow-hidden">${task.observacoes}</div>` : ''}
+                ${checklistSummary}
+            `;
+
+            card.querySelector('.del-btn').onclick = () => {
+                if(confirm("Excluir esta tarefa?")) deleteTaskFromFirebase(task.id);
+            };
+            card.querySelector('.edit-btn').onclick = () => openModal(task);
+            card.querySelector('.dup-btn').onclick = () => {
+                const newTask = {...task, id: 'task-' + Date.now()};
+                openModal(newTask, true);
+            };
+
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', task.id);
+                card.style.opacity = '0.5';
+            });
+            card.addEventListener('dragend', () => card.style.opacity = '1');
+
+            return card;
+        };
+
+        const renderConsolidatedTable = () => {
+            const consolidatedView = document.getElementById('consolidated-view');
+            if (allTasksFromDB.length === 0) {
+                consolidatedView.innerHTML = '<p class="p-8 text-center text-gray-400">Nenhuma tarefa cadastrada.</p>';
+                return;
+            }
+
+            const today = new Date();
+            today.setHours(0,0,0,0);
+
+            let html = `
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="p-3 border">Solicitante</th>
+                            <th class="p-3 border">Tarefa</th>
+                            <th class="p-3 border">Prazo</th>
+                            <th class="p-3 border">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+            
+            allTasksFromDB.forEach(t => {
+                let prazoHtml = '-';
+                if (t.status === 'done' && t.dataEntrega) {
+                    prazoHtml = `<span class="text-green-600 font-medium">Entregue</span>`;
+                } else if (t.dataAgendamento) {
+                    const due = new Date(t.dataAgendamento + "T00:00:00");
+                    const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+                    if (diffDays < 0) prazoHtml = `<span class="text-red-500 font-bold">Atrasado ${Math.abs(diffDays)}d</span>`;
+                    else if (diffDays === 0) prazoHtml = `<span class="text-orange-500 font-bold">Vence hoje</span>`;
+                    else if (diffDays <= 30) prazoHtml = `<span>${diffDays} dias</span>`;
+                    else prazoHtml = `<span>~${Math.floor(diffDays/30)} meses</span>`;
+                }
+
+                const statusMap = { todo: 'A Fazer', doing: 'Em Andamento', done: 'Concluído' };
+                const colorMap = { todo: 'bg-orange-100 text-orange-700', doing: 'bg-blue-100 text-blue-700', done: 'bg-green-100 text-green-700' };
+
+                html += `
+                    <tr>
+                        <td class="p-3 border">${t.solicitante || '-'}</td>
+                        <td class="p-3 border font-medium">${t.tarefa}</td>
+                        <td class="p-3 border">${prazoHtml}</td>
+                        <td class="p-3 border">
+                            <span class="px-2 py-1 rounded-full text-[10px] font-bold ${colorMap[t.status]}">${statusMap[t.status]}</span>
+                        </td>
+                    </tr>`;
+            });
+
+            html += `</tbody></table>`;
+            consolidatedView.innerHTML = html;
+        };
+
+        const updateDashboard = () => {
+            document.getElementById('total-tasks').textContent = allTasksFromDB.length;
+            document.getElementById('todo-tasks').textContent = allTasksFromDB.filter(t => t.status === 'todo').length;
+            document.getElementById('doing-tasks').textContent = allTasksFromDB.filter(t => t.status === 'doing').length;
+            document.getElementById('done-tasks').textContent = allTasksFromDB.filter(t => t.status === 'done').length;
+        };
+
+        // --- Drag and Drop ---
+
+        document.querySelectorAll('.task-column').forEach(col => {
+            col.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('drag-over'); });
+            col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+            col.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                col.classList.remove('drag-over');
+                const taskId = e.dataTransfer.getData('text/plain');
+                const newStatus = col.dataset.columnId;
+                
+                const task = allTasksFromDB.find(t => t.id === taskId);
+                if (task && task.status !== newStatus) {
+                    const updatedTask = { ...task, status: newStatus };
+                    // Autocomplete data entrega se mover para done
+                    if (newStatus === 'done' && !updatedTask.dataEntrega) {
+                        updatedTask.dataEntrega = new Date().toISOString().split('T')[0];
+                    }
+                    await saveTaskToFirebase(updatedTask);
+                }
+            });
+        });
+
+        // --- Modal Logic ---
+
+        const openModal = (task = null, isDup = false) => {
+            taskForm.reset();
+            document.getElementById('taskObservacoes').innerHTML = '';
+            checklistContainer.innerHTML = '';
+            
+            if (task) {
+                modalTitle.textContent = isDup ? 'Duplicar Tarefa' : 'Editar Tarefa';
+                document.getElementById('taskId').value = isDup ? 'task-' + Date.now() : task.id;
+                document.getElementById('taskTarefa').value = task.tarefa;
+                document.getElementById('taskSolicitante').value = task.solicitante || '';
+                document.getElementById('taskDataSolicitacao').value = task.dataSolicitacao || '';
+                document.getElementById('taskDataAgendamento').value = task.dataAgendamento || '';
+                document.getElementById('taskDataEntrega').value = task.dataEntrega || '';
+                document.getElementById('taskObservacoes').innerHTML = task.observacoes || '';
+                
+                if (task.checklist) {
+                    const items = JSON.parse(task.checklist);
+                    items.forEach(i => addChecklistItem(i.text, i.checked));
+                }
+            } else {
+                modalTitle.textContent = 'Nova Tarefa';
+                document.getElementById('taskId').value = 'task-' + Date.now();
+            }
+            
+            taskModal.classList.remove('hidden');
+            taskModal.classList.add('flex');
+        };
+
+        const addChecklistItem = (text, checked = false) => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-2 bg-gray-50 p-2 rounded';
+            div.innerHTML = `
+                <input type="checkbox" ${checked ? 'checked' : ''} class="h-4 w-4">
+                <input type="text" value="${text}" class="flex-grow bg-transparent text-sm focus:outline-none">
+                <button type="button" class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>
+            `;
+            div.querySelector('button').onclick = () => div.remove();
+            checklistContainer.appendChild(div);
+        };
+
+        addChecklistItemBtn.onclick = () => {
+            const val = checklistItemInput.value.trim();
+            if (val) { addChecklistItem(val); checklistItemInput.value = ''; }
+        };
+
+        // Suporte para colar imagens nas observações
+        document.getElementById('taskObservacoes').addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (const item of items) {
+                if (item.type.indexOf('image') === 0) {
+                    const blob = item.getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = document.createElement('img');
+                        img.src = event.target.result;
+                        document.getElementById('taskObservacoes').appendChild(img);
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        });
+
+        taskForm.onsubmit = async (e) => {
             e.preventDefault();
-            const title = document.getElementById('taskTitle').value;
-            const requester = document.getElementById('taskRequester').value;
+            const id = document.getElementById('taskId').value;
+            const tarefa = document.getElementById('taskTarefa').value;
+            const dataEntrega = document.getElementById('taskDataEntrega').value;
+            
+            const checklist = [];
+            checklistContainer.querySelectorAll('.flex').forEach(item => {
+                const text = item.querySelector('input[type="text"]').value.trim();
+                const checked = item.querySelector('input[type="checkbox"]').checked;
+                if (text) checklist.push({ text, checked });
+            });
+
+            const originalTask = allTasksFromDB.find(t => t.id === id);
+            let status = originalTask ? originalTask.status : 'todo';
+            if (dataEntrega) status = 'done';
+
+            const taskData = {
+                id,
+                boardId: currentBoardId,
+                status,
+                tarefa,
+                solicitante: document.getElementById('taskSolicitante').value,
+                dataSolicitacao: document.getElementById('taskDataSolicitacao').value,
+                dataAgendamento: document.getElementById('taskDataAgendamento').value,
+                dataEntrega,
+                observacoes: document.getElementById('taskObservacoes').innerHTML,
+                checklist: JSON.stringify(checklist)
+            };
+
+            await saveTaskToFirebase(taskData);
+            taskModal.classList.add('hidden');
+        };
+
+        cancelBtn.onclick = () => taskModal.classList.add('hidden');
+        addTaskBtn.onclick = () => openModal();
+
+        // --- AI Features ---
+
+        generateAIBtn.onclick = async () => {
+            const title = document.getElementById('taskTarefa').value;
+            if (!title) return alert("Digite o título da tarefa primeiro.");
+            
+            generateAIBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            generateAIBtn.disabled = true;
+
+            const payload = {
+                contents: [{ parts: [{ text: `Gere uma lista de 5 subtarefas para: "${title}"` }] }],
+                systemInstruction: { parts: [{ text: "Aja como um analista de processos. Retorne apenas uma lista simples de ações curtas separadas por quebra de linha." }] }
+            };
 
             try {
-                await addDoc(tasksCol, {
-                    title,
-                    requester,
-                    status: 'todo',
-                    createdAt: new Date()
-                });
-                closeModal();
-                document.getElementById('taskForm').reset();
-            } catch (error) {
-                console.error("Erro ao salvar:", error);
-            }
-        });
+                const resp = await fetch(GEMINI_API_URL, { method: 'POST', body: JSON.stringify(payload) });
+                const data = await resp.json();
+                const text = data.candidates[0].content.parts[0].text;
+                text.split('\n').filter(l => l.trim()).forEach(l => addChecklistItem(l.trim().replace(/^[\d.-]\s*/, '')));
+            } catch (err) { alert("Erro ao conectar com a IA."); }
+            
+            generateAIBtn.innerHTML = '✨ Gerar com IA';
+            generateAIBtn.disabled = false;
+        };
 
-        // ESCUTAR MUDANÇAS EM TEMPO REAL
-        onSnapshot(tasksCol, (snapshot) => {
-            renderTasks(snapshot.docs);
-        });
+        generateSummaryBtn.onclick = async () => {
+            summaryModal.classList.remove('hidden');
+            summaryModal.classList.add('flex');
+            summaryContent.innerHTML = '<div class="text-center p-8"><i class="fas fa-spinner fa-spin text-3xl text-purple-500"></i><p class="mt-4">Analisando dados...</p></div>';
 
-        function renderTasks(docs) {
-            const lists = { todo: '', doing: '', done: '' };
-            let counts = { todo: 0, doing: 0, done: 0 };
+            const tasksStr = allTasksFromDB.map(t => `- ${t.tarefa} (${t.status})`).join('\n');
+            const payload = {
+                contents: [{ parts: [{ text: `Analise estas tarefas e dê um resumo motivacional:\n${tasksStr}` }] }],
+                systemInstruction: { parts: [{ text: "Aja como um coach de produtividade sênior. Responda em Português Brasileiro, formate com HTML simples (tags p, b, br, ul, li)." }] }
+            };
 
-            docs.forEach(docSnap => {
-                const task = docSnap.data();
-                const id = docSnap.id;
-                counts[task.status]++;
+            try {
+                const resp = await fetch(GEMINI_API_URL, { method: 'POST', body: JSON.stringify(payload) });
+                const data = await resp.json();
+                summaryContent.innerHTML = data.candidates[0].content.parts[0].text;
+            } catch (err) { summaryContent.innerHTML = "Erro ao gerar resumo."; }
+        };
 
-                const html = `
-                    <div class="task-card bg-white p-3 rounded shadow border-b-2 border-gray-300" draggable="true" ondragstart="event.dataTransfer.setData('text/plain', '${id}')">
-                        <div class="flex justify-between items-start">
-                            <h4 class="font-semibold text-gray-800">${task.title}</h4>
-                            <button onclick="deleteTask('${id}')" class="text-red-400 hover:text-red-600 text-xs"><i class="fas fa-trash"></i></button>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-2"><i class="fas fa-user mr-1"></i>${task.requester || 'N/A'}</p>
-                    </div>
-                `;
-                lists[task.status] += html;
+        closeSummaryBtn.onclick = () => summaryModal.classList.add('hidden');
+
+        // --- Import / Export ---
+
+        exportBtn.onclick = () => {
+            const headers = "boardId;status;id;tarefa;solicitante;dataSolicitacao;dataAgendamento;dataEntrega;observacoes_b64;checklist_b64";
+            const rows = allTasksFromDB.map(t => {
+                return [
+                    t.boardId, t.status, t.id, 
+                    `"${t.tarefa}"`, `"${t.solicitante || ''}"`,
+                    t.dataSolicitacao || '', t.dataAgendamento || '', t.dataEntrega || '',
+                    btoa(unescape(encodeURIComponent(t.observacoes || ''))),
+                    btoa(unescape(encodeURIComponent(t.checklist || '')))
+                ].join(';');
             });
+            const csv = "sep=;\n" + headers + "\n" + rows.join("\n");
+            const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "backup_painel_firebase.csv";
+            a.click();
+        };
 
-            // Atualizar Colunas
-            document.getElementById('todo-list').innerHTML = lists.todo;
-            document.getElementById('doing-list').innerHTML = lists.doing;
-            document.getElementById('done-list').innerHTML = lists.done;
+        importBtn.onclick = () => importFile.click();
+        importFile.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const lines = event.target.result.split('\n').filter(l => l.trim() && !l.startsWith('sep='));
+                const headers = lines[0].split(';');
+                
+                loadingOverlay.classList.remove('hidden');
+                loadingOverlay.querySelector('p').textContent = "Importando tarefas...";
 
-            // Atualizar Dashboard
-            document.getElementById('total-tasks').innerText = docs.length;
-            document.getElementById('todo-count').innerText = counts.todo;
-            document.getElementById('doing-count').innerText = counts.doing;
-            document.getElementById('done-count').innerText = counts.done;
-        }
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    const data = {};
+                    headers.forEach((h, idx) => {
+                        let val = (values[idx] || '').trim();
+                        if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1).replace(/""/g, '"');
+                        data[h.trim()] = val;
+                    });
 
-        // DELETAR TAREFA
-        window.deleteTask = async (id) => {
-            if(confirm('Deseja excluir esta tarefa?')) {
-                await deleteDoc(doc(db, "tasks", id));
+                    try {
+                        data.observacoes = decodeURIComponent(escape(atob(data.observacoes_b64 || '')));
+                        data.checklist = decodeURIComponent(escape(atob(data.checklist_b64 || '')));
+                    } catch(ex) { console.warn("B64 fail", ex); }
+
+                    // Limpa campos temporários do CSV
+                    delete data.observacoes_b64;
+                    delete data.checklist_b64;
+
+                    await saveTaskToFirebase(data);
+                }
+                loadingOverlay.classList.add('hidden');
+                alert("Importação concluída!");
+            };
+            reader.readAsText(file);
+        };
+
+        clearAllBtn.onclick = async () => {
+            if (confirm(`Tem certeza que deseja apagar TODAS as tarefas deste painel (${boards.find(b=>b.id===currentBoardId).name})?`)) {
+                const toDelete = allTasksFromDB.filter(t => t.boardId === currentBoardId);
+                for (const t of toDelete) {
+                    await deleteTaskFromFirebase(t.id);
+                }
             }
-        }
+        };
 
-        // DRAG AND DROP LOGIC
-        const columns = document.querySelectorAll('.task-column');
-        columns.forEach(col => {
-            col.addEventListener('dragover', (e) => e.preventDefault());
-            col.addEventListener('drop', async (e) => {
-                const id = e.dataTransfer.getData('text/plain');
-                const newStatus = col.getAttribute('data-status');
-                await updateDoc(doc(db, "tasks", id), { status: newStatus });
-            });
-        });
+        // Initialize
+        initApp();
+        renderTabs();
+
     </script>
 </body>
 </html>
